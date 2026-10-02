@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Responsive Dashboard</title>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+   <main class="h-screen overflow-hidden">
+      <div class="flex h-full relative">
+         
+         <!-- Mobile Sidebar Overlay / Backdrop -->
+         <div id="sidebar-overlay" 
+              class="fixed inset-0 bg-slate-900/50 z-30 opacity-0 pointer-events-none lg:hidden transition-opacity duration-300 ease-in-out">
+         </div>
+
+         <!-- Sidebar -->
+         <aside id="sidebar" 
+                aria-label="Sidebar navigation"
+                class="fixed lg:static top-0 left-0 z-40 h-full w-[264px] min-w-[264px] bg-white border-r border-slate-300 transition-all duration-300 ease-in-out -translate-x-full lg:translate-x-0">
+            
+            <div id="sidebar-inner" class="w-[264px] h-full flex flex-col overflow-y-auto py-6 px-4">
+               
+               <!-- Logo -->
+               <div class="mb-8 flex items-center justify-between">
+                  <a href="#" class="min-h-9 inline-block focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded">
+                     <span class="sr-only">Your Company</span>
+                     <img src="https://readymadeui.com/readymadeui.svg" alt="logo" class="w-36 block" />
+                  </a>
+               </div>
+
+               <!-- Navigation Links -->
+               <nav class="flex-1 space-y-1" aria-label="Primary sidebar navigation">
+                  <div>
+                     <button type="button" aria-controls="sub-menu-0" aria-expanded="false"
+                        class="flex items-center gap-2.5 cursor-pointer w-full text-sm text-slate-800 font-medium text-left group collapsible-toggle hover:text-slate-900 hover:bg-slate-100 rounded-md px-3 py-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="size-[18px] fill-current overflow-visible"
+                           viewBox="0 0 512 512" aria-hidden="true">
+                           <path
+                              d="M426 495.983H86c-25.364 0-46-20.635-46-46v-242.02c0-8.836 7.163-16 16-16s16 7.164 16 16v242.02c0 7.72 6.28 14 14 14h340c7.72 0 14-6.28 14-14v-242.02c0-8.836 7.163-16 16-16s16 7.164 16 16v242.02c0 25.364-20.635 46-46 46"
+                              data-original="#000000" />
+                           <path
+                              d="M496 263.958a15.95 15.95 0 0 1-11.313-4.687L285.698 60.284c-16.375-16.376-43.02-16.376-59.396 0L27.314 259.272c-6.248 6.249-16.379 6.249-22.627 0-6.249-6.248-6.249-16.379 0-22.627L203.675 37.656c28.852-28.852 75.799-28.852 104.65 0l198.988 198.988c6.249 6.249 6.249 16.379 0 22.627A15.94 15.94 0 0 1 496 263.958M320 495.983H192c-8.837 0-16-7.164-16-16v-142c0-27.57 22.43-50 50-50h60c27.57 0 50 22.43 50 50v142c0 8.836-7.163 16-16 16m-112-32h96v-126c0-9.925-8.075-18-18-18h-60c-9.925 0-18 8.075-18 18z"
+                              data-original="#000000" />
+                        </svg>
+
+                        <span class="flex-1">Dashboard</span>
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="arrow size-3 fill-current transition-transform duration-300 -rotate-90"
+                           viewBox="0 0 24 24" aria-hidden="true">
+                           <path
+                              d="M12.016 18a1.5 1.5 0 0 1-1.065-.434l-9-9a1.506 1.506 0 0 1 2.13-2.13l7.935 7.95L19.95 6.45a1.5 1.5 0 0 1 2.115 2.115l-9 9a1.5 1.5 0 0 1-1.05.435"
+                              data-name="16" data-original="#000000" />
+                        </svg>
+                     </button>
+
+                     <ul id="sub-menu-0"
+                        style="max-height: 0px;"
+                        class="space-y-1 text-sm text-slate-600 font-medium px-3 my-1 overflow-hidden transition-all duration-300">
+                        <li>
+                           <a href="#"
+                              class="block hover:text-slate-900 hover:bg-slate-100 rounded-md px-3 py-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                              Analytics
+                           </a>
+                        </li>
+                        <li>
+                           <a href="#"
+                              class="block hover:text-slate-900 hover:bg-slate-100 rounded-md px-3 py-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                              Logistics
+                           </a>
+                        </li>
+                        <li>
+                           <a href="#"
+                              class="block hover:text-slate-900 hover:bg-slate-100 rounded-md px-3 py-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                              Academy
+                           </a>
+                        </li>
+                     </ul>
+                  </div>
+               </nav>
+            </div>
+         </aside>
+
+         <!-- Main Content Wrapper -->
+         <div class="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
+            <!-- Header -->
+            <header class="sticky top-0 w-full bg-white border-b border-slate-300 px-4 lg:px-6 min-h-[68px] z-20 flex items-center" aria-label="header">
+               <div class="flex items-center gap-4 w-full">
+                  
+                  <!-- Sidebar Toggle Btn -->
+                  <button type="button" aria-controls="sidebar" aria-expanded="false" id="toggleSidebar"
+                     class="cursor-pointer p-1.5 hover:bg-slate-100 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                     <span class="sr-only">Toggle sidebar menu</span>
+                     <svg xmlns="http://www.w3.org/2000/svg" class="size-[18px] fill-slate-900"
+                        viewBox="0 0 20 20" aria-hidden="true">
+                        <path fill-rule="evenodd"
+                           d="M.13 17.05a1.41 1.41 0 0 1 1.41-1.41H10a1.41 1.41 0 1 1 0 2.82H1.54a1.41 1.41 0 0 1-1.41-1.41zm0-14.1a1.41 1.41 0 0 1 1.41-1.41h16.92a1.41 1.41 0 1 1 0 2.82H1.54A1.41 1.41 0 0 1 .13 2.95zm0 7.05a1.41 1.41 0 0 1 1.41-1.41h16.92a1.41 1.41 0 1 1 0 2.82H1.54A1.41 1.41 0 0 1 .13 10z"
+                           clip-rule="evenodd" data-original="#000000" />
+                     </svg>
+                  </button>
+
+                  <h1 class="text-xl text-slate-900 font-bold truncate">Dashboard</h1>
+
+                  <div class="flex items-center gap-3 ml-auto">
+                     
+                     <!-- Search Wrapper -->
+                     <div class="relative" id="searchWrapper">
+                        <form role="search" id="searchBox"
+                           class="hidden lg:flex items-center gap-2.5 px-3 py-2 rounded-md bg-white border border-slate-300 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 transition-all">
+                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192.904 192.904"
+                              class="size-4 fill-slate-400 shrink-0" aria-hidden="true">
+                              <path
+                                 d="m190.707 180.101-47.078-47.077c11.702-14.072 18.752-32.142 18.752-51.831C162.381 36.423 125.959 0 81.191 0 36.422 0 0 36.423 0 81.193c0 44.767 36.422 81.187 81.191 81.187 19.688 0 37.759-7.049 51.831-18.751l47.079 47.078a7.474 7.474 0 0 0 5.303 2.197 7.498 7.498 0 0 0 5.303-12.803zM15 81.193C15 44.694 44.693 15 81.191 15c36.497 0 66.189 29.694 66.189 66.193 0 36.496-29.692 66.187-66.189 66.187C44.693 147.38 15 117.689 15 81.193z">
+                              </path>
+                           </svg>
+                           <input type="search" placeholder="Search..."
+                              class="text-sm text-slate-900 w-full outline-none bg-transparent placeholder:text-slate-400" />
+                        </form>
+
+                        <!-- Mobile search icon -->
+                        <button id="searchToggle" type="button" aria-label="Toggle Search"
+                           class="lg:hidden p-2 hover:bg-slate-100 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192.904 192.904"
+                              class="size-[18px] fill-slate-600" aria-hidden="true">
+                              <path
+                                 d="m190.707 180.101-47.078-47.077c11.702-14.072 18.752-32.142 18.752-51.831C162.381 36.423 125.959 0 81.191 0 36.422 0 0 36.423 0 81.193c0 44.767 36.422 81.187 81.191 81.187 19.688 0 37.759-7.049 51.831-18.751l47.079 47.078a7.474 7.474 0 0 0 5.303 2.197 7.498 7.498 0 0 0 5.303-12.803zM15 81.193C15 44.694 44.693 15 81.191 15c36.497 0 66.189 29.694 66.189 66.193 0 36.496-29.692 66.187-66.189 66.187C44.693 147.38 15 117.689 15 81.193z">
+                              </path>
+                           </svg>
+                        </button>
+                     </div>
+
+                     <!-- Profile Dropdown -->
+                     <div class="relative">
+                        <button type="button" id="dropdown-toggle" aria-haspopup="true" aria-expanded="false"
+                           aria-controls="dropdown-menu"
+                           class="border border-slate-300 rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 block">
+                           <img src="https://readymadeui.com/team-1.webp" alt="profile-pic" class="size-9 rounded-full object-cover" />
+                        </button>
+
+                        <!-- Dropdown Menu -->
+                        <ul id="dropdown-menu" aria-labelledby="dropdown-toggle"
+                           class="hidden absolute right-0 top-full mt-2 p-1.5 space-y-0.5 min-w-48 text-slate-800 text-sm font-medium bg-white border border-slate-300 rounded-md shadow-lg z-30">
+                           <li>
+                              <a href="#"
+                                 class="dropdown-item w-full p-2 flex items-center gap-2.5 rounded-md transition-colors hover:text-slate-900 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                                 <svg xmlns="http://www.w3.org/2000/svg" class="size-[18px] fill-current shrink-0" viewBox="0 0 512 512" aria-hidden="true">
+                                    <path d="M253.414 103.434c48.556 0 87.919 40.52 87.919 90.505s-39.363 90.505-87.919 90.505-87.919-40.521-87.919-90.505 39.363-90.505 87.919-90.505m0 36.202c-28.324 0-51.717 24.081-51.717 54.303s23.393 54.303 51.717 54.303 51.717-24.081 51.717-54.303-23.393-54.303-51.717-54.303" />
+                                    <path d="M253.414 0c139.957 0 253.414 113.457 253.414 253.414 0 94.285-51.491 176.544-127.886 220.19-35.728 20.575-77.036 32.582-121.104 33.199l-4.423.025C113.457 506.828 0 393.371 0 253.414S113.457 0 253.414 0m-23.676 346.505c-46.331 0-87.479 29.378-102.607 73.008l-2.339 7.571c35.919 27.232 80.165 42.893 126.504 43.522l5.709-.009c38.24-.62 74.079-11.122 105.072-29.064l19.977-13.243-2.237-6.866c-14.371-44.046-55.062-74.052-101.239-74.901zm23.676-310.303c-119.963 0-217.212 97.249-217.212 217.212 0 57.493 22.337 109.77 58.807 148.624 21.668-55.072 74.965-91.735 134.73-91.735h46.831c59.905 0 113.311 36.835 134.885 92.121 36.686-38.892 59.172-91.325 59.172-149.01-.001-119.963-97.25-217.212-217.213-217.212" />
+                                 </svg>
+                                 My Profile
+                              </a>
+                           </li>
+                           <li>
+                              <a href="#"
+                                 class="dropdown-item w-full p-2 flex items-center gap-2.5 rounded-md transition-colors hover:text-slate-900 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                                 <svg xmlns="http://www.w3.org/2000/svg" class="size-[18px] fill-current shrink-0" viewBox="0 0 32 32" aria-hidden="true">
+                                    <path d="M24.915 3.663a3.15 3.15 0 0 0-2.688-1.554H9.774a3.15 3.15 0 0 0-2.688 1.554L.859 14.446a3.15 3.15 0 0 0 0 3.15l6.227 10.742a3.15 3.15 0 0 0 2.688 1.554h12.453a3.15 3.15 0 0 0 2.688-1.554l6.226-10.784a3.15 3.15 0 0 0 0-3.15zm4.41 12.841-6.227 10.784a1.05 1.05 0 0 1-.871.504H9.774a1.05 1.05 0 0 1-.872-.504L2.676 16.504a1.05 1.05 0 0 1 0-1.05L8.902 4.713a1.05 1.05 0 0 1 .872-.504h12.453a1.05 1.05 0 0 1 .871.504l6.227 10.783a1.05 1.05 0 0 1 0 1.008" />
+                                    <path d="M16 9.7a6.3 6.3 0 1 0 6.3 6.3A6.3 6.3 0 0 0 16 9.7m0 10.5a4.2 4.2 0 1 1 4.2-4.2 4.2 4.2 0 0 1-4.2 4.2" />
+                                 </svg>
+                                 Account Settings
+                              </a>
+                           </li>
+                           <li>
+                              <a href="#"
+                                 class="dropdown-item w-full p-2 flex items-center gap-2.5 rounded-md transition-colors hover:text-slate-900 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                                 <svg xmlns="http://www.w3.org/2000/svg" class="size-[18px] fill-current shrink-0" viewBox="0 0 512 512" aria-hidden="true">
+                                    <path d="M456 80H56c-30.878 0-56 25.122-56 56v240c0 30.878 25.122 56 56 56h400c30.878 0 56-25.122 56-56V136c0-30.878-25.122-56-56-56M56 112h400c13.233 0 24 10.767 24 24v32H32v-32c0-13.233 10.767-24 24-24m400 288H56c-13.233 0-24-10.767-24-24V200h448v176c0 13.233-10.767 24-24 24" />
+                                    <path d="M112 352H96c-8.836 0-16-7.164-16-16v-16c0-8.836 7.164-16 16-16h16c8.836 0 16 7.164 16 16v16c0 8.836-7.164 16-16 16" />
+                                 </svg>
+                                 Billing & Payments
+                              </a>
+                           </li>
+                           <li class="border-t border-slate-200 pt-1">
+                              <a href="#"
+                                 class="dropdown-item w-full p-2 flex items-center gap-2.5 rounded-md text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+                                 <svg xmlns="http://www.w3.org/2000/svg" class="size-[18px] fill-current shrink-0" viewBox="0 0 6.35 6.35">
+                                    <path d="M3.172.292a.289.29 0 0 0-.286.292v2.318a.289.29 0 0 0 .578 0V.584a.289.29 0 0 0-.292-.292m1.683.58a.289.29 0 0 0-.029 0 .289.29 0 0 0-.16.512c.5.426.816 1.06.816 1.772A2.31 2.31 0 0 1 3.176 5.48 2.31 2.31 0 0 1 .87 3.16c0-.709.311-1.339.806-1.766a.289.29 0 1 0-.375-.44 2.9 2.9 0 0 0-1.01 2.203A2.9 2.9 0 0 0 3.178 6.06 2.896 2.896 0 0 0 6.06 3.156 2.9 2.9 0 0 0 5.04.944a.289.29 0 0 0-.185-.072" />
+                                 </svg>
+                                 Logout
+                              </a>
+                           </li>
+                        </ul>
+                     </div>
+
+                  </div>
+               </div>
+            </header>
+
+            <!-- Dashboard Content -->
+         <button id='display' class="flex">Add members</button>
+            <div class="">
+            <section class="p-4 lg:p-6 flex-1"id='hidden-box'>
+               <div id='display' class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <!-- Sample Content Cards -->
+                  <div class="grid bg-white p-4 rounded-lg border border-slate-200 shadow-sm justify-center">
+                     <button id=btn class="absolute right-10 border-2">&times;</button>
+                     <div>
+                        <label for="name" class="mb-2 text-slate-900 font-medium text-sm inline-block ">Name</label>
+                        <input type="text" id="name" name="name" placeholder="Enter the name" required class="px-3 py-2.5 text-sm text-slate-900 rounded-md bg-white w-full outline-1 -outline-offset-1  border-2" />
+                        <p class="flex font-size:20px text-red-500 justify-center" id="m1"></p>
+                     </div>
+                     <div>
+                        <label for="email" class="mb-2 text-slate-900 font-medium text-sm inline-block ">Mobile no</label>
+                        <input type="text" id="mobile" name="mobile" placeholder="Enter the name" required class="px-3 py-2.5 text-sm text-slate-900 rounded-md bg-white w-full outline-1 -outline-offset-1  border-2" />
+                        <p class="flex font-size:20px text-red-500 justify-center" id="m2"></p>
+                     </div>
+                     <div>
+                        <label for="email" class="mb-2 text-slate-900 font-medium text-sm inline-block ">Name</label>
+                        <input type="text" id="email" name="email" placeholder="Enter the name" required class="px-3 py-2.5 text-sm text-slate-900 rounded-md bg-white w-full outline-1 -outline-offset-1  border-2" />
+                        <p class="flex font-size:20px text-red-500 justify-center" id="m3"></p>
+                     </div>
+                      <br>
+                     <button type="submit" id="subscribeBtn" class="w-full py-2 px-3.5 text-sm rounded-md font-semibold cursor-pointer tracking-wide text-white border border-blue-600 bg-blue-600 hover:bg-blue-700 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">Create an account</button>
+                     
+                  </div>
+               </div>
+            </section>
+            </div>
+         </div>
+      </div>
+   </main>
+<script type="module">
+   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+   import {getDatabase, ref, push} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+
+   const firebaseConfig = {
+  apiKey: "AIzaSyAVWLIDjsmMcH2kfqiKwQ1-jFU6d6654pY",
+  authDomain: "myproject-fdb4c.firebaseapp.com",
+  databaseURL: "https://myproject-fdb4c-default-rtdb.firebaseio.com",
+  projectId: "myproject-fdb4c",
+  storageBucket: "myproject-fdb4c.firebasestorage.app",
+  messagingSenderId: "600134367178",
+  appId: "1:600134367178:web:ea8b0daa3928c7791c8133"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+document.addEventListener("DOMContentLoaded", () => {
+
+   // --- Sidebar Elements ---
+   const toggleBtn = document.getElementById("toggleSidebar");
+   const sidebar = document.getElementById("sidebar");
+   const overlay = document.getElementById("sidebar-overlay");
+
+   function isDesktop() {
+      return window.innerWidth >= 1024;
+   }
+
+   // Set initial explicit collapsed/expanded classes based on viewport
+   function initSidebarState() {
+      if (isDesktop()) {
+         // On desktop, sidebar starts visible
+         toggleBtn.setAttribute("aria-expanded", "true");
+         sidebar.classList.remove("lg:w-0", "lg:min-w-0", "lg:overflow-hidden");
+         sidebar.classList.add("lg:w-[264px]", "lg:min-w-[264px]");
+      } else {
+         // On mobile, sidebar starts hidden
+         toggleBtn.setAttribute("aria-expanded", "false");
+         sidebar.classList.remove("translate-x-0");
+         sidebar.classList.add("-translate-x-full");
+      }
+   }
+
+   function openSidebar() {
+      toggleBtn.setAttribute("aria-expanded", "true");
+      if (isDesktop()) {
+         sidebar.classList.remove("lg:w-0", "lg:min-w-0", "lg:overflow-hidden");
+         sidebar.classList.add("lg:w-[264px]", "lg:min-w-[264px]");
+      } else {
+         sidebar.classList.remove("-translate-x-full");
+         sidebar.classList.add("translate-x-0");
+         if (overlay) {
+            overlay.classList.remove("opacity-0", "pointer-events-none");
+            overlay.classList.add("opacity-100", "pointer-events-auto");
+         }
+      }
+   }
+
+   function closeSidebar() {
+      toggleBtn.setAttribute("aria-expanded", "false");
+      if (isDesktop()) {
+         sidebar.classList.remove("lg:w-[264px]", "lg:min-w-[264px]");
+         sidebar.classList.add("lg:w-0", "lg:min-w-0", "lg:overflow-hidden");
+      } else {
+         sidebar.classList.remove("translate-x-0");
+         sidebar.classList.add("-translate-x-full");
+         if (overlay) {
+            overlay.classList.remove("opacity-100", "pointer-events-auto");
+            overlay.classList.add("opacity-0", "pointer-events-none");
+         }
+      }
+   }
+
+   // Corrected Click Event Listener
+   toggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isExpanded = toggleBtn.getAttribute("aria-expanded") === "true";
+      // If currently expanded -> close it; if currently collapsed -> open it
+      if (isExpanded) {
+         closeSidebar();
+      } else {
+         openSidebar();
+      }
+   });
+
+   if (overlay) {
+      overlay.addEventListener("click", closeSidebar);
+   }
+
+   // Initialize correct state immediately on load
+   initSidebarState();
+
+   // Handle Window Resize
+   window.addEventListener("resize", () => {
+      if (isDesktop()) {
+         if (overlay) {
+            overlay.classList.remove("opacity-100", "pointer-events-auto");
+            overlay.classList.add("opacity-0", "pointer-events-none");
+         }
+      }
+   });
+
+   // --- Search Toggle Logic ---
+   const searchToggleBtn = document.getElementById("searchToggle");
+   const searchBox = document.getElementById("searchBox");
+   const searchWrapper = document.getElementById("searchWrapper");
+
+   if (searchToggleBtn && searchBox) {
+      searchToggleBtn.addEventListener("click", (e) => {
+         e.stopPropagation();
+         const isHidden = searchBox.classList.contains("max-lg:hidden") || searchBox.classList.contains("hidden");
+
+         if (isHidden) {
+            searchBox.classList.remove("max-lg:hidden", "hidden");
+            searchBox.classList.add("flex", "absolute", "right-0", "top-full", "mt-2", "w-64", "z-50", "shadow-lg", "bg-white");
+            const input = searchBox.querySelector("input");
+            if (input) input.focus();
+         } else {
+            resetSearch();
+         }
+      });
+   }
+
+   function resetSearch() {
+      if (searchBox) {
+         searchBox.classList.add("max-lg:hidden");
+         searchBox.classList.remove("flex", "absolute", "right-0", "top-full", "mt-2", "w-64", "z-50", "shadow-lg");
+      }
+   }
+
+   document.addEventListener("click", (e) => {
+      if (searchWrapper && !searchWrapper.contains(e.target)) {
+         resetSearch();
+      }
+   });
+
+   // --- Profile Dropdown Logic ---
+   const profileToggle = document.getElementById("dropdown-toggle");
+   const profileMenu = document.getElementById("dropdown-menu");
+   const profileLinks = profileMenu ? profileMenu.querySelectorAll(".dropdown-item") : [];
+
+   function showProfileMenu() {
+      if (profileMenu) {
+         profileMenu.classList.remove("hidden");
+         profileMenu.classList.add("block");
+         profileToggle.setAttribute("aria-expanded", "true");
+      }
+   }
+
+   function hideProfileMenu() {
+      if (profileMenu) {
+         profileMenu.classList.add("hidden");
+         profileMenu.classList.remove("block");
+         profileToggle.setAttribute("aria-expanded", "false");
+      }
+   }
+
+   if (profileToggle) {
+      profileToggle.addEventListener("click", (e) => {
+         e.stopPropagation();
+         const isExpanded = profileToggle.getAttribute("aria-expanded") === "true";
+         isExpanded ? hideProfileMenu() : showProfileMenu();
+      });
+   }
+
+   document.addEventListener("click", (e) => {
+      if (profileMenu && !profileMenu.contains(e.target) && e.target !== profileToggle) {
+         hideProfileMenu();
+      }
+   });
+
+   profileLinks.forEach(link => link.addEventListener("click", hideProfileMenu));
+
+   // Keyboard accessibility (ESC key)
+   document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+         hideProfileMenu();
+         resetSearch();
+         if (!isDesktop() && toggleBtn.getAttribute("aria-expanded") === "true") {
+            closeSidebar();
+         }
+      }
+   });
+
+   // --- Collapsible Submenus Logic ---
+   document.querySelectorAll(".collapsible-toggle").forEach((btn) => {
+      btn.addEventListener("click", function () {
+         const menu = this.nextElementSibling;
+         if (!menu) return;
+
+         const arrowIcon = this.querySelector(".arrow");
+         const isOpen = menu.offsetHeight > 0;
+
+         if (isOpen) {
+            menu.style.maxHeight = "0px";
+            if (arrowIcon) arrowIcon.classList.add("-rotate-90");
+            this.setAttribute("aria-expanded", "false");
+         } else {
+            menu.style.maxHeight = menu.scrollHeight + "px";
+            if (arrowIcon) arrowIcon.classList.remove("-rotate-90");
+            this.setAttribute("aria-expanded", "true");
+         }
+      });
+   });
+});
+
+const name = document.getElementById("name");
+const mobile = document.getElementById("mobile");
+const email = document.getElementById("email");
+
+//for subscribe the device
+const subscribeBtn = document.getElementById("subscribeBtn");
+// Register Service Worker
+async function registerServiceWorker() {
+    const registration = await navigator.serviceWorker.register("/service-worker.js");
+    console.log("Service Worker registered");
+    return registration;
+}
+// Convert VAPID key
+function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64 =
+        (base64String + padding)
+            .replace(/-/g, "+")
+            .replace(/_/g, "/");
+    const rawData =window.atob(base64);
+    return Uint8Array.from(
+        [...rawData].map(char => char.charCodeAt(0))
+    );
+}
+// Subscribe device
+subscribeBtn.addEventListener("click", async () => {
+   document.getElementById("m1").innerText='';
+   document.getElementById("m2").innerText='';
+   document.getElementById("m3").innerText='';
+   
+   if(!name.value){
+   document.getElementById("m1").innerText='Enter the name';
+   return;
+   }else if(!mobile.value){
+      document.getElementById('m2').innerText='Enter the mobile';
+      return;
+   }else if(!email.value){
+      document.getElementById("m3").innerText='Enter the Email';
+      return;
+   }else{
+      try {
+         if (!window.isSecureContext || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+            throw new Error("Push notifications require HTTPS or localhost.");
+         }
+
+         const permission = await Notification.requestPermission();
+         if (permission !== "granted") {
+            alert("Notification permission denied");
+            return;
+         }
+
+         const registration = await registerServiceWorker();
+         const publicKey = "BFKtDIwBjMBUdIoEP5mgv14ak4M3DUSvmRbwLpapdCRorgUS7yx8DVUTxA0_iSVOcEQf_xQjljc3mgYTkuqPuRI";
+         const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey)
+         });
+         const subscriptionData = subscription.toJSON();
+        const response = await fetch("/subscribe", {
+            method: "POST",
+            headers: {
+               "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+               ...subscriptionData,
+               name: name.value.trim(),
+               mobile: mobile.value.trim(),
+               email: email.value.trim()
+            })
+         });
+         if (!response.ok) {
+            throw new Error(`Server rejected subscription (${response.status}).`);
+         }
+
+         await push(ref(db, "owners"), {
+            name: name.value.trim(),
+            mobile: mobile.value.trim(),
+            email: email.value.trim(),
+            notificationSubscription: subscriptionData,
+            createdAt: new Date().toISOString()
+         });
+         alert("Notifications enabled!");
+      } catch (error) {
+         console.error("Subscription failed:", error);
+         alert(`Could not enable notifications: ${error.message}`);
+      }
+   }
+});
+document.getElementById("btn").addEventListener('click',()=>{
+   document.getElementById("hidden-box").style.display='none';
+})
+document.getElementById("display").addEventListener('click',()=>{
+   document.getElementById("hidden-box").style.display='block';
+})
+
+</script>
+</body>
+</html>

@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreshMart — Pure Juice, Pure Life</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          green: { DEFAULT: '#3d8c40', light: '#6dbf5b' },
+          lime: '#c8e85a',
+          cream: '#faf6ef',
+          ink: '#1c2b1d',
+          muted: '#6b7c6c',
+        },
+        fontFamily: {
+          serif: ['"Playfair Display"', 'serif'],
+          sans: ['"DM Sans"', 'sans-serif'],
+        },
+        borderRadius: { xl2: '24px' },
+      },
+    },
+  };
+</script>
+<style>
+/* ---- Only what Tailwind can't express: CSS variables (for dark mode),
+   keyframe animations, and a few pseudo-element effects ---- */
+:root {
+  --green: #3d8c40;
+  --green-light: #6dbf5b;
+  --lime: #c8e85a;
+  --cream: #faf6ef;
+  --dark: #0e1a0f;
+  --text: #1c2b1d;
+  --muted: #6b7c6c;
+  --card-bg: #ffffff;
+  --nav-bg: rgba(250,246,239,0.92);
+  --sidebar-bg: #faf6ef;
+  --transition: 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+body.dark {
+  --cream: #0e1a0f;
+  --text: #e8f0e8;
+  --muted: #8fa88f;
+  --card-bg: #162518;
+  --nav-bg: rgba(14,26,15,0.92);
+  --sidebar-bg: #111d12;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--cream);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  transition: background var(--transition), color var(--transition);
+  overflow-x: hidden;
+  cursor: none;
+}
+
+/* ── BG BLOBS ── */
+.blobs { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+.blob { position:absolute; border-radius:50%; filter:blur(80px); opacity:0.18; animation:drift 14s ease-in-out infinite alternate; }
+.blob-1 { width:520px; height:520px; background:#6dbf5b; top:-120px; right:-100px; }
+.blob-2 { width:380px; height:380px; background:#c8e85a; bottom:60px; left:-80px; animation-delay:-4s; }
+.blob-3 { width:260px; height:260px; background:#f7c948; top:40%; left:45%; animation-delay:-8s; }
+@keyframes drift { from{transform:translate(0,0) scale(1)} to{transform:translate(30px,40px) scale(1.08)} }
+
+nav { background:var(--nav-bg); backdrop-filter:blur(20px); transition: background var(--transition); animation: navSlideDown 0.6s cubic-bezier(0.22,1,0.36,1) both; }
+@keyframes navSlideDown { from{opacity:0; transform:translateY(-100%);} to{opacity:1; transform:translateY(0);} }
+.logo { color:var(--green); animation: logoReveal 0.8s 0.2s cubic-bezier(0.22,1,0.36,1) both; }
+@keyframes logoReveal { from{opacity:0; transform:scale(0.8) rotate(-4deg);} to{opacity:1; transform:scale(1) rotate(0deg);} }
+.logo span { color:var(--green-light); }
+.nav-links a { color:var(--muted); position:relative; opacity:0; animation: navFade 0.6s ease forwards; }
+.nav-links a:hover { color:var(--green); }
+.nav-links a::after { content:''; position:absolute; bottom:-5px; left:0; width:0; height:2px; background:var(--green-light); transition:width 0.3s; }
+.nav-links a:hover::after { width:100%; }
+.nav-links a:nth-child(1){animation-delay:.3s} .nav-links a:nth-child(2){animation-delay:.42s}
+.nav-links a:nth-child(3){animation-delay:.54s} .nav-links a:nth-child(4){animation-delay:.66s}
+@keyframes navFade { from{opacity:0; transform:translateY(-10px);} to{opacity:1; transform:translateY(0);} }
+.icon-btn { color:var(--text); transition:border-color 0.2s, background 0.2s, transform 0.2s; }
+.icon-btn:hover { background:rgba(61,140,64,0.08); border-color:var(--green); transform:rotate(15deg) scale(1.1); }
+.nav-cart:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(61,140,64,0.3); }
+.cart-count { transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.2s; }
+.cart-count.bump { animation: cartBump 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes cartBump { 0%{transform:scale(1);} 50%{transform:scale(1.6); background:rgba(255,255,255,0.6);} 100%{transform:scale(1);} }
+
+/* ── SIDEBAR ── */
+.sidebar-overlay { position:fixed; inset:0; z-index:149; background:rgba(0,0,0,0); pointer-events:none; transition:background 0.38s; }
+.sidebar-overlay.active { background:rgba(0,0,0,0.35); pointer-events:all; }
+.sidebar { position:fixed; top:0; left:0; height:100%; width:0; z-index:150; overflow:hidden; transition:width 0.42s cubic-bezier(0.77,0,0.18,1); box-shadow:4px 0 32px rgba(0,0,0,0.12); }
+.sidebar.open { width:300px; }
+.sidebar-inner { width:300px; height:100%; background:var(--sidebar-bg); display:flex; flex-direction:column; overflow:hidden; transition:background var(--transition); }
+.sb-title-dot { box-shadow:0 0 6px rgba(109,191,91,0.6); animation:pulse-dot 2s ease-in-out infinite; }
+@keyframes pulse-dot { 0%,100%{box-shadow:0 0 6px rgba(109,191,91,0.6);} 50%{box-shadow:0 0 14px rgba(109,191,91,1);} }
+.sb-close-btn { transition:background 0.2s, color 0.2s, transform 0.3s; }
+.sb-close-btn:hover { background:rgba(61,140,64,0.15); color:var(--text); transform:rotate(90deg); }
+.sb-search-wrap input { background:var(--card-bg); color:var(--text); transition:border-color 0.25s, box-shadow 0.25s, transform 0.2s; }
+.sb-search-wrap input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(61,140,64,0.12); transform:scaleX(1.01); }
+.sb-stat { position:relative; overflow:hidden; }
+.sb-stat::after { content:''; position:absolute; inset:0; background:rgba(61,140,64,0.08); transform:scaleY(0); transform-origin:bottom; transition:transform 0s; border-radius:4px; }
+.sb-stat.flash::after { animation:statFlash 0.5s cubic-bezier(0.22,1,0.36,1); }
+@keyframes statFlash { 0%{transform:scaleY(1); opacity:1;} 100%{transform:scaleY(0); opacity:0;} }
+.sb-stat-num { color:var(--green); transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1), color 0.3s; }
+.sb-stat-num.count-up { animation:countPop 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes countPop { 0%{transform:scale(1);} 45%{transform:scale(1.4); color:var(--green-light);} 100%{transform:scale(1);} }
+.sb-list::-webkit-scrollbar { width:4px; }
+.sb-list::-webkit-scrollbar-track { background:transparent; }
+.sb-list::-webkit-scrollbar-thumb { background:rgba(61,140,64,0.2); border-radius:10px; }
+.ref-item { background:var(--card-bg); transition:transform 0.25s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s, border-color 0.25s, opacity 0.25s; opacity:0; transform:translateX(-16px) scaleY(0.92); transform-origin:top; }
+.ref-item.revealed { opacity:1; transform:translateX(0) scaleY(1); }
+.ref-item:hover { transform:translateX(4px) scaleY(1) !important; box-shadow:0 6px 20px rgba(61,140,64,0.12); border-color:rgba(61,140,64,0.22); }
+.ref-avatar { background:linear-gradient(135deg,rgba(109,191,91,0.2),rgba(61,140,64,0.15)); color:var(--green); transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.ref-item:hover .ref-avatar { transform:scale(1.1) rotate(-5deg); }
+.ref-name { color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ref-code-row { overflow:hidden; clip-path:inset(0 100% 0 0); transition:clip-path 0.5s cubic-bezier(0.22,1,0.36,1); }
+.ref-item.revealed .ref-code-row { clip-path:inset(0 0% 0 0); }
+.ref-code-value { color:var(--green); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ref-copy-btn { color:var(--green); transition:background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s; }
+.ref-copy-btn:hover { background:rgba(61,140,64,0.16); border-color:var(--green); transform:scale(1.06); }
+.ref-copy-btn:active { transform:scale(0.95); }
+.ref-copy-btn.copied { background:var(--green); color:#fff; border-color:var(--green); }
+.ref-copy-btn.failed { background:#dc3545; color:#fff; border-color:#dc3545; }
+.ref-slots { overflow:hidden; }
+.slot-badge { opacity:0; transform:translateY(6px) scale(0.88); transition:opacity 0.35s, transform 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+.ref-item.revealed .slot-badge { opacity:1; transform:translateY(0) scale(1); }
+.ref-item.revealed .slot-badge:nth-child(1){transition-delay:.18s} .ref-item.revealed .slot-badge:nth-child(2){transition-delay:.27s}
+.slot-badge.left-open { background:rgba(93,184,255,0.12); color:#2a8ac4; border:1px solid rgba(93,184,255,0.2); }
+.slot-badge.right-open { background:rgba(255,181,71,0.12); color:#b07a20; border:1px solid rgba(255,181,71,0.2); }
+.slot-badge.full { background:rgba(61,140,64,0.1); color:var(--green); border:1px solid rgba(61,140,64,0.2); }
+.sb-empty { color:var(--muted); animation:fadeUp 0.5s ease both; }
+@keyframes fadeUp { from{opacity:0; transform:translateY(12px);} to{opacity:1; transform:translateY(0);} }
+.sb-spinner { border:2.5px solid rgba(61,140,64,0.15); border-top-color:var(--green); animation:spin 0.8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg);} }
+
+/* ── HERO ── */
+.badge { color:var(--green); animation: badgeIn 0.7s 0.6s cubic-bezier(0.34,1.56,0.64,1) both; }
+@keyframes badgeIn { from{opacity:0; transform:translateY(10px) scale(0.9);} to{opacity:1; transform:translateY(0) scale(1);} }
+.badge::before { content:''; width:7px; height:7px; background:var(--green-light); border-radius:50%; display:block; }
+.hero-text h1 { color:var(--text); animation: heroH1 0.9s 0.75s cubic-bezier(0.22,1,0.36,1) both; }
+@keyframes heroH1 { from{opacity:0; transform:translateY(24px);} to{opacity:1; transform:translateY(0);} }
+.hero-text h1 em { font-style:italic; color:var(--green); }
+.hero-text p { color:var(--muted); animation: heroH1 0.9s 0.9s cubic-bezier(0.22,1,0.36,1) both; }
+.hero-actions { animation: heroH1 0.9s 1.05s cubic-bezier(0.22,1,0.36,1) both; }
+.btn-primary { background:linear-gradient(135deg,var(--green-light),var(--green)); transition:transform 0.25s, box-shadow 0.25s; box-shadow:0 6px 24px rgba(61,140,64,0.3); position:relative; overflow:hidden; }
+.btn-primary::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,0.2),transparent); opacity:0; transition:opacity 0.25s; }
+.btn-primary:hover { transform:translateY(-3px); box-shadow:0 14px 32px rgba(61,140,64,0.4); }
+.btn-primary:hover::after { opacity:1; }
+.btn-ghost { color:var(--text); transition:border-color 0.2s, background 0.2s, transform 0.2s; }
+.btn-ghost:hover { border-color:var(--green); background:rgba(61,140,64,0.06); transform:translateY(-2px); }
+.hero-stats { animation: heroH1 0.9s 1.2s cubic-bezier(0.22,1,0.36,1) both; }
+.hero-stat-item { opacity:0; transform:translateY(16px); animation: statReveal 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+.hero-stat-item:nth-child(1){animation-delay:1.3s} .hero-stat-item:nth-child(2){animation-delay:1.45s} .hero-stat-item:nth-child(3){animation-delay:1.6s}
+@keyframes statReveal { from{opacity:0; transform:translateY(16px);} to{opacity:1; transform:translateY(0);} }
+.stat-num { color:var(--text); }
+.stat-label { color:var(--muted); }
+
+.hero-visual { animation: heroH1 1s 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+.img-ring { background:conic-gradient(from 180deg,#6dbf5b22,#c8e85a33,#f7c94822,#6dbf5b22); animation:spin-slow 20s linear infinite; }
+.img-ring-inner { animation:spin-slow 20s linear infinite reverse; }
+.img-ring-inner img { animation:float 5s ease-in-out infinite; }
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+@keyframes spin-slow { to{transform:rotate(360deg)} }
+.tag { background:var(--card-bg); color:var(--text); opacity:0; transform:scale(0.7); animation: tagIn 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards, float 5s ease-in-out 0.8s infinite; }
+.tag-1 { animation-delay:1.4s,0s; }
+.tag-2 { animation-delay:1.6s,0.2s; }
+@keyframes tagIn { from{opacity:0; transform:scale(0.7) translateY(8px);} to{opacity:1; transform:scale(1) translateY(0);} }
+.dot-green { background:#6dbf5b; } .dot-amber { background:#f7c948; }
+
+/* ── PRODUCTS ── */
+.section-header h2 { color:var(--text); clip-path:inset(0 100% 0 0); animation: textReveal 0.9s 0.2s cubic-bezier(0.22,1,0.36,1) forwards; }
+@keyframes textReveal { from{clip-path:inset(0 100% 0 0);} to{clip-path:inset(0 0% 0 0);} }
+.section-header h2 span { color:var(--green); }
+.see-all { color:var(--green); transition:gap 0.2s, transform 0.2s; }
+.see-all:hover { gap:10px; transform:translateX(3px); }
+
+.product-card { background:var(--card-bg); transition:transform 0.3s cubic-bezier(0.22,1,0.36,1), box-shadow 0.3s, border-color 0.3s; position:relative; overflow:hidden; opacity:0; transform:translateY(28px) scale(0.95); }
+.product-card.revealed { opacity:1; transform:translateY(0) scale(1); transition:opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1), box-shadow 0.3s, border-color 0.3s; }
+.product-card::before { content:''; position:absolute; inset:0; border-radius:24px; background:linear-gradient(135deg,rgba(109,191,91,0.06),transparent); opacity:0; transition:opacity 0.3s; }
+.product-card:hover { transform:translateY(-6px) scale(1.01) !important; box-shadow:0 20px 48px rgba(0,0,0,0.1); border-color:rgba(61,140,64,0.2); }
+.product-card:hover::before { opacity:1; }
+.product-card::after { content:''; position:absolute; top:0; left:-100%; width:60%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent); transform:skewX(-20deg); transition:left 0.6s ease; }
+.product-card:hover::after { left:160%; }
+.product-emoji { filter:drop-shadow(0 4px 8px rgba(0,0,0,0.12)); transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.product-card:hover .product-emoji { transform:scale(1.15) rotate(8deg); }
+.product-price { color:var(--green); }
+
+/* ── TOAST ── */
+.toast { background:var(--card-bg); color:var(--text); box-shadow:0 8px 24px rgba(0,0,0,0.12); animation:toastIn 0.4s cubic-bezier(0.34,1.56,0.64,1); overflow:hidden; clip-path:inset(0 0 0 0 round 12px); position:relative; }
+@keyframes toastIn { from{opacity:0; transform:translateX(30px) scale(0.9); clip-path:inset(0 100% 0 0 round 12px);} to{opacity:1; transform:translateX(0) scale(1); clip-path:inset(0 0 0 0 round 12px);} }
+.toast-progress { position:absolute; bottom:0; left:0; height:2px; background:var(--green-light); border-radius:0 0 12px 12px; animation:toastProgress 2.8s linear forwards; }
+@keyframes toastProgress { from{width:100%;} to{width:0%;} }
+
+footer { color:var(--muted); animation: fadeUp 0.6s 0.3s ease both; }
+footer a { color:var(--green); text-decoration:none; }
+
+.scroll-reveal { opacity:0; transform:translateY(24px); transition:opacity 0.6s ease, transform 0.6s cubic-bezier(0.22,1,0.36,1); }
+.scroll-reveal.in-view { opacity:1; transform:translateY(0); }
+
+/* ── CUSTOM CURSOR ── */
+.cursor { width:10px; height:10px; background:linear-gradient(136deg,#443f3f,#6cff6c); border-radius:50%; position:fixed; pointer-events:none; transform:translate(-50%,-50%); box-shadow:0 0 20px lime; z-index:9999; }
+.ring { width:35px; height:35px; border:2px solid #5a5a5a; border-radius:50%; position:fixed; pointer-events:none; transform:translate(-50%,-50%); z-index:9998; transition:transform 0.08s linear; }
+@keyframes click { 0%{transform:translate(-50%,-50%) scale(1); opacity:1;} 100%{transform:translate(-50%,-50%) scale(1.8); opacity:0;} }
+
+@media(max-width:900px){
+  .cursor,.ring{ display:none; }
+  body{ cursor:auto; }
+}
+@media(max-width:480px){
+  .sidebar.open { width:280px; }
+  .sidebar-inner { width:280px; }
+  .cursor,.ring{ display:none; }
+  body{ cursor:auto; }
+}
+</style>
+</head>
+<body class="text-[15px] leading-relaxed">
+
+<div class="blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+<div class="toast-container fixed bottom-6 right-6 z-[500] flex flex-col gap-2" id="toastContainer"></div>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="mySidebar">
+  <div class="sidebar-inner">
+    <div class="sb-header flex items-start justify-between px-5 pt-5 pb-4 border-b border-green/10 bg-green/[0.04]">
+      <div class="flex flex-col gap-[3px]">
+        <div class="sb-title flex items-center gap-2 font-serif text-[17px] font-bold">
+          <span class="sb-title-dot inline-block w-2 h-2 rounded-full bg-green-light"></span>
+          Referral Network
+        </div>
+        <div class="text-xs" style="color:var(--muted)">Members with open slots</div>
+      </div>
+      <button class="sb-close-btn w-8 h-8 rounded-full bg-green/[0.08] border border-green/15 text-lg flex items-center justify-center" onclick="closeSidebar()">×</button>
+    </div>
+    <div class="sb-search px-4 pt-3.5 pb-2.5 border-b border-green/10">
+      <div class="relative">
+        <span class="sb-search-icon absolute left-2.5 top-1/2 -translate-y-1/2 text-sm" style="color:var(--muted)">🔍</span>
+        <input type="text" id="sbSearchInput" placeholder="Search by name or code…" oninput="filterReferrals()"
+          class="w-full py-2.5 pl-9 pr-3 rounded-[10px] border border-green/[0.18] text-[13px] outline-none">
+      </div>
+    </div>
+    <div class="sb-stats flex border-b border-green/10">
+      <div class="sb-stat flex-1 text-center py-2.5 px-3 border-r border-green/10">
+        <div class="sb-stat-num font-serif text-lg font-bold leading-none" id="sbTotal">—</div>
+        <div class="text-[10px] mt-0.5 tracking-wide" style="color:var(--muted)">Total</div>
+      </div>
+      <div class="sb-stat flex-1 text-center py-2.5 px-3 border-r border-green/10">
+        <div class="sb-stat-num font-serif text-lg font-bold leading-none" id="sbOpenSlots">—</div>
+        <div class="text-[10px] mt-0.5 tracking-wide" style="color:var(--muted)">Open Slots</div>
+      </div>
+      <div class="sb-stat flex-1 text-center py-2.5 px-3">
+        <div class="sb-stat-num font-serif text-lg font-bold leading-none" id="sbRewarded">—</div>
+        <div class="text-[10px] mt-0.5 tracking-wide" style="color:var(--muted)">Rewarded</div>
+      </div>
+    </div>
+    <div class="sb-list flex-1 overflow-y-auto p-3" id="sbList">
+      <div class="sb-loading text-center py-8 px-5">
+        <div class="sb-spinner w-7 h-7 rounded-full mx-auto mb-2.5"></div>
+        <div class="text-[13px]" style="color:var(--muted)">Loading referrals…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NAVBAR -->
+<nav class="sticky top-0 z-[100] flex items-center justify-between px-[6%] py-4 border-b border-green/[0.08]">
+  <button class="icon-btn w-[38px] h-[38px] rounded-full border border-green/25 flex items-center justify-center text-lg" onclick="openSidebar()" title="View Referrals">☰</button>
+  <div class="logo font-serif text-2xl font-bold tracking-tight">Fresh<span>Mart</span></div>
+  <div class="nav-links hidden md:flex gap-8">
+    <a href="#" class="text-sm font-medium">Home</a>
+    <a href="#" class="text-sm font-medium">Products</a>
+    <a href="copy.html" class="text-sm font-medium">About</a>
+    <a href="#" class="text-sm font-medium">Contact</a>
+  </div>
+  <div class="nav-right flex gap-2.5 items-center">
+    <button class="icon-btn w-[38px] h-[38px] rounded-full border border-green/25 flex items-center justify-center text-base" onclick="toggleDark()" id="darkToggle" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero relative z-[1] grid grid-cols-1 md:grid-cols-2 items-center gap-12 max-w-[1280px] mx-auto px-[6%] pt-20 pb-14 text-center md:text-left">
+  <div class="hero-text">
+    <div class="badge inline-flex items-center gap-[7px] bg-green/10 border border-green/20 px-3.5 py-1.5 rounded-full text-xs font-medium mb-5 tracking-wide">100% Organic &amp; Cold-Pressed</div>
+    <h1 class="font-serif text-[clamp(38px,5vw,62px)] leading-[1.15] font-bold mb-5">Drink <em>Fresh.</em><br>Live Better.</h1>
+    <p class="text-[17px] font-light max-w-[440px] mb-9 mx-auto md:mx-0">Premium organic juices delivered straight to your door — pure, natural, and bursting with flavour. No preservatives, ever.</p>
+    <div class="hero-actions flex gap-3.5 items-center flex-wrap justify-center md:justify-start">
+      <button class="btn-primary text-white px-9 py-4 rounded-full text-[15px] font-medium" onclick="goToShop()">Shop Now →</button>
+      <button class="btn-ghost px-7 py-4 rounded-full border-[1.5px] border-green/30 text-[15px] font-medium">Learn More</button>
+    </div>
+    <div class="hero-stats flex gap-8 mt-11 pt-8 border-t border-green/10 justify-center md:justify-start">
+      <div class="hero-stat-item"><div class="stat-num font-serif text-[26px] font-bold">50+</div><div class="stat-label text-xs mt-0.5">Juice Varieties</div></div>
+      <div class="hero-stat-item"><div class="stat-num font-serif text-[26px] font-bold">12k</div><div class="stat-label text-xs mt-0.5">Happy Customers</div></div>
+      <div class="hero-stat-item"><div class="stat-num font-serif text-[26px] font-bold">100%</div><div class="stat-label text-xs mt-0.5">Organic Certified</div></div>
+    </div>
+  </div>
+  <div class="hero-visual flex items-center justify-center relative">
+    <div class="img-ring w-[280px] h-[280px] md:w-[400px] md:h-[400px] rounded-full p-2">
+      <div class="img-ring-inner w-full h-full rounded-full overflow-hidden">
+        <img src="https://img3.exportersindia.com/product_images/bc-full/2021/8/4085268/palak-keerai-seed-1629700987-5953589.jpeg" alt="Fresh fruit juice" class="w-full h-full object-cover rounded-full">
+      </div>
+    </div>
+    <div class="tag tag-1 absolute top-2.5 left-0 md:top-[30px] md:-left-[30px] rounded-2xl px-4 py-2.5 shadow-lg text-[13px] font-medium flex items-center gap-2">
+      <span class="tag-dot dot-green w-2 h-2 rounded-full"></span> Farm Fresh Today
+    </div>
+    <div class="tag tag-2 absolute bottom-5 right-0 md:bottom-[60px] md:-right-5 rounded-2xl px-4 py-2.5 shadow-lg text-[13px] font-medium flex items-center gap-2">
+      <span class="tag-dot dot-amber w-2 h-2 rounded-full"></span> Free Delivery
+    </div>
+  </div>
+</section>
+
+<!-- PRODUCTS -->
+<section class="section relative z-[1] max-w-[1300px] mx-auto px-[6%] pt-10 pb-20">
+  <div class="section-header scroll-reveal flex items-end justify-between mb-10 flex-wrap gap-4">
+    <h2 class="font-serif text-[clamp(28px,3.5vw,40px)] font-bold leading-tight">Our <span>Best Sellers</span></h2>
+    <a href="#" class="see-all text-sm font-medium flex items-center gap-1.5 no-underline">View all →</a>
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 
+            bg-[url('/img/mountains.jpg')] 
+            bg-cover bg-center 
+            mask-b-from-50% mask-radial-[50%_90%] mask-radial-from-80%">
+
+    <img
+        src="https://th.bing.com/th/id/OIG2.dZn9YpJWEh2cXe1wulCv?pid=ImgGnhttps://static.vecteezy.com/system/resources/previews/011/965/361/large_2x/bunch-of-fresh-spinach-indian-palak-leaf-piled-up-on-the-market-ready-to-be-sold-or-making-curry-palak-on-wooden-background-photo.jpg"
+        alt="image"
+        class="w-full h-auto rounded-lg object-cover"
+    />
+
+    <img
+        src="https://th.bing.com/th/id/OIG4.TfJouzJqN38ICBnBC4xR?pid=ImgGn"
+        alt="image"
+        class="w-full h-auto rounded-lg object-cover"
+    />
+
+    <img
+        src="https://th.bing.com/th/id/OIG1.BIkDVTq9Vovq9c892mOl?pid=ImgGn"
+        alt="image"
+        class="w-full h-auto rounded-lg object-cover"
+    />
+
+    <img
+        src="https://th.bing.com/th/id/OIG3.pzkCzJDGaxPHejAM.Ly_?pid=ImgGn"
+        alt="image"
+        class="w-full h-auto rounded-lg object-cover"
+    />
+
+    <img
+        src="https://th.bing.com/th/id/OIG4.sSjTO4E3xqwEX87LRhLp?pid=ImgGn"
+        alt="image"
+        class="w-full h-auto rounded-lg object-cover"
+    />
+
+    <img
+        src="https://th.bing.com/th/id/OIG4.QDksV1ozKgLX5GrUk6Rg?pid=ImgGn"
+        alt="image"
+        class="w-full h-auto rounded-lg object-cover"
+    />
+
+    <img
+        src="https://th.bing.com/th/id/OIG3..qvjl.5uTExootXTyFaF?pid=ImgGn"
+        alt="image"
+        class="w-full h-auto rounded-lg object-cover"
+    />
+
+    <img
+        src="https://th.bing.com/th/id/OIG4.hV1F018JbS9rGwZRmnxe?pid=ImgGn"
+        alt="image"
+        class="w-full h-auto rounded-lg object-cover"
+    />
+
+</div>
+</section>
+
+<footer class="relative z-[1] text-center px-[6%] py-8 text-[13px] border-t border-green/10">
+  © 2026 <a href="#">FreshMart</a> · All rights reserved · Made with 🍃
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<script>
+/* ══ FIREBASE ══ */
+firebase.initializeApp({
+  apiKey: "AIzaSyAVWLIDjsmMcH2kfqiKwQ1-jFU6d6654pY",
+  authDomain: "myproject-fdb4c.firebaseapp.com",
+  databaseURL: "https://myproject-fdb4c-default-rtdb.firebaseio.com",
+  projectId: "myproject-fdb4c",
+  storageBucket: "myproject-fdb4c.firebasestorage.app",
+  messagingSenderId: "600134367178",
+  appId: "1:600134367178:web:ea8b0daa3928c7791c8133"
+});
+const db = firebase.database();
+
+/* ══ STATE ══ */
+let allMembers = [];
+
+/* ══ HELPERS ══ */
+function getInitials(name) {
+  if (!name) return '?';
+  return name.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+function calcPoints(member, allTree) {
+  function subtree(code) {
+    if (!code) return 0;
+    const found = Object.values(allTree).find(u => u && u.d === code);
+    if (!found) return 0;
+    return 1 + subtree(found.left) + subtree(found.right);
+  }
+  return Math.min(subtree(member.d) * 10, 100);
+}
+
+/* ══ ANIMATED STAT NUMBER ══ */
+function animateStat(elId, toVal) {
+  const el = document.getElementById(elId);
+  const from = parseInt(el.textContent) || 0;
+  if (from === toVal) return;
+  el.classList.remove('count-up');
+  void el.offsetWidth;
+  el.classList.add('count-up');
+  const start = performance.now();
+  const duration = 500;
+  function step(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(from + (toVal - from) * ease);
+    if (t < 1) requestAnimationFrame(step);
+    else { el.textContent = toVal; }
+  }
+  requestAnimationFrame(step);
+  const cell = el.closest('.sb-stat');
+  if (cell) {
+    cell.classList.remove('flash');
+    void cell.offsetWidth;
+    cell.classList.add('flash');
+  }
+}
+
+/* ══ SIDEBAR ══ */
+function openSidebar() {
+  document.getElementById('mySidebar').classList.add('open');
+  document.getElementById('sidebarOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+  document.getElementById('mySidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+/* ══ RENDER REFERRALS ══ */
+function renderReferrals(members) {
+  const list = document.getElementById('sbList');
+  const total     = members.length;
+  const openSlots = members.filter(m => (m.left ? 1 : 0) + (m.right ? 1 : 0) < 2).length;
+  const rewarded  = members.filter(m => (m.pts || 0) >= 100).length;
+
+  animateStat('sbTotal',    total);
+  animateStat('sbOpenSlots', openSlots);
+  animateStat('sbRewarded',  rewarded);
+
+  if (!members.length) {
+    list.innerHTML = `<div class="sb-empty text-center py-10 px-5"><div class="text-4xl mb-2.5 opacity-50">🌿</div><div class="text-[13px]">No referrals found</div></div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  members.forEach((m, idx) => {
+    const name    = m.a || 'Unknown';
+    const refCode = m.d || '—';
+    const pts     = m.pts || 0;
+    const hasLeft = !!m.left, hasRight = !!m.right;
+    const slots   = (hasLeft ? 1 : 0) + (hasRight ? 1 : 0);
+
+    let slotHtml = '';
+    if (pts >= 100) {
+      slotHtml = `<span class="slot-badge full text-[10px] font-medium px-2 py-[3px] rounded-full tracking-wide">✓ Rewarded ₹500</span>`;
+    } else {
+      if (!hasLeft)  slotHtml += `<span class="slot-badge left-open text-[10px] font-medium px-2 py-[3px] rounded-full tracking-wide">Left open</span>`;
+      if (!hasRight) slotHtml += `<span class="slot-badge right-open text-[10px] font-medium px-2 py-[3px] rounded-full tracking-wide">Right open</span>`;
+      if (slots === 2) slotHtml = `<span class="slot-badge full text-[10px] font-medium px-2 py-[3px] rounded-full tracking-wide">Full network</span>`;
+    }
+
+    const item = document.createElement('div');
+    item.className = 'ref-item rounded-2xl px-3.5 py-3 mb-2 border border-green/[0.08]';
+    item.dataset.search = (name + refCode).toLowerCase();
+    item.innerHTML = `
+      <div class="ref-top flex items-center gap-2.5 mb-2.5">
+        <div class="ref-avatar w-[38px] h-[38px] rounded-full border-[1.5px] border-green/20 flex items-center justify-center font-serif text-[13px] font-bold flex-shrink-0">${getInitials(name)}</div>
+        <div class="ref-meta flex-1 min-w-0">
+          <div class="ref-name text-[13px] font-medium">${name}</div>
+        </div>
+      </div>
+      <div class="ref-code-row flex items-center gap-2 bg-green/5 border border-green/[0.12] rounded-lg px-2.5 py-[7px]">
+        <span class="ref-code-label text-[10px] font-medium tracking-wide uppercase flex-shrink-0" style="color:var(--muted)">Code</span>
+        <span class="ref-code-value flex-1 font-mono text-[13px] font-bold tracking-wide" id="code-${idx}">${refCode}</span>
+        <button class="ref-copy-btn flex-shrink-0 px-2.5 py-1 rounded-md border border-green/25 bg-green/[0.08] text-[11px] font-medium flex items-center gap-1" id="copyBtn-${idx}" onclick="copyCode('${refCode.replace(/'/g,"\\'")}',${idx})">
+          <span class="btn-text">❏ Copy</span>
+        </button>
+      </div>
+      ${slotHtml ? `<div class="ref-slots flex gap-1.5 mt-2">${slotHtml}</div>` : ''}
+    `;
+    list.appendChild(item);
+
+    requestAnimationFrame(() => {
+      setTimeout(() => item.classList.add('revealed'), idx * 55);
+    });
+  });
+}
+
+/* ══ COPY CODE ══ */
+function copyCode(code, idx) {
+  const btn = document.getElementById('copyBtn-' + idx);
+
+  function onSuccess() {
+    btn.innerHTML = '✓ Copied!';
+    btn.classList.add('copied');
+    showToast(`Copied: ${code}`);
+    setTimeout(() => {
+      btn.innerHTML = '<span class="btn-text">❏ Copy</span>';
+      btn.classList.remove('copied');
+    }, 2200);
+  }
+
+  function onFail() {
+    btn.innerHTML = '✗ Failed';
+    btn.classList.add('failed');
+    setTimeout(() => {
+      btn.innerHTML = '<span class="btn-text">❏ Copy</span>';
+      btn.classList.remove('failed');
+    }, 2200);
+  }
+
+  function fallbackCopy() {
+    const tmp = document.createElement('textarea');
+    tmp.value = code;
+    tmp.style.cssText = [
+      'position:fixed','top:50%','left:50%','width:2em','height:2em','padding:0',
+      'border:none','outline:none','box-shadow:none','background:transparent',
+      'opacity:0','z-index:-1','transform:translate(-50%,-50%)'
+    ].join(';');
+    document.body.appendChild(tmp);
+    tmp.focus();
+    if (navigator.userAgent.match(/ipad|iphone/i)) {
+      const range = document.createRange();
+      range.selectNodeContents(tmp);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      tmp.setSelectionRange(0, 999999);
+    } else {
+      tmp.select();
+    }
+    try {
+      const ok = document.execCommand('copy');
+      ok ? onSuccess() : onFail();
+    } catch(e) {
+      onFail();
+    }
+    document.body.removeChild(tmp);
+  }
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(code).then(onSuccess).catch(fallbackCopy);
+  } else {
+    fallbackCopy();
+  }
+}
+
+/* ══ FILTER ══ */
+function filterReferrals() {
+  const q = document.getElementById('sbSearchInput').value.trim().toLowerCase();
+  const filtered = q ? allMembers.filter(m => (m.a+m.d+m.b).toLowerCase().includes(q)) : allMembers;
+  renderReferrals(filtered);
+}
+
+/* ══ TOAST ══ */
+function showToast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast rounded-xl px-4 py-3 text-[13px] font-medium flex items-center gap-2 max-w-[280px] border border-green/20 border-l-[3px]';
+  el.style.borderLeftColor = 'var(--green)';
+  el.innerHTML = `<span>🌿</span> ${msg}<div class="toast-progress"></div>`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => {
+    el.style.transition = 'opacity 0.35s, transform 0.35s';
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(30px) scale(0.9)';
+    setTimeout(() => el.remove(), 360);
+  }, 2800);
+}
+
+/* ══ FIREBASE ══ */
+db.ref('submit').on('value', snap => {
+  const raw = snap.val() || {};
+  allMembers = Object.values(raw).filter(Boolean).map(m => ({ ...m, pts: calcPoints(m, raw) }));
+  allMembers.sort((a, b) => {
+    const aS = (a.left?1:0)+(a.right?1:0), bS = (b.left?1:0)+(b.right?1:0);
+    if (aS !== bS) return aS - bS;
+    return (b.pts||0) - (a.pts||0);
+  });
+  renderReferrals(allMembers);
+}, () => {
+  document.getElementById('sbList').innerHTML = `<div class="sb-empty text-center py-10 px-5"><div class="text-4xl mb-2.5 opacity-50">⚠️</div><div class="text-[13px]">Failed to load — check connection</div></div>`;
+});
+
+
+/* ══ SCROLL REVEAL ══ */
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const el = entry.target;
+      const siblings = [...el.parentElement.children];
+      const idx = siblings.indexOf(el);
+      setTimeout(() => el.classList.add('revealed'), idx * 80);
+      revealObserver.unobserve(el);
+    }
+  });
+}, { threshold: 0.1 });
+document.querySelectorAll('.product-card').forEach(c => revealObserver.observe(c));
+
+const genericObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in-view'); genericObserver.unobserve(e.target); } });
+}, { threshold: 0.12 });
+document.querySelectorAll('.scroll-reveal').forEach(el => genericObserver.observe(el));
+
+/* ══ DARK MODE ══ */
+function toggleDark() {
+  document.body.classList.toggle('dark');
+  document.getElementById('darkToggle').textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+}
+
+/* ══ SHOP / CART BUTTON (nav only — product add-to-cart removed) ══ */
+function goToShop() { window.location.href = 'page1.html'; }
+
+/* ══ CUSTOM CURSOR ══ */
+const cursor = document.createElement("div");
+cursor.classList.add("cursor");
+document.body.appendChild(cursor);
+const ring = document.createElement("div");
+ring.classList.add("ring");
+document.body.appendChild(ring);
+let mouseX = window.innerWidth/2, mouseY = window.innerHeight/2;
+let ringX = mouseX, ringY = mouseY;
+document.addEventListener("mousemove", (e) => {
+  mouseX = e.clientX; mouseY = e.clientY;
+  cursor.style.left = mouseX + "px";
+  cursor.style.top = mouseY + "px";
+});
+function animate() {
+  ringX += (mouseX - ringX) * 0.15;
+  ringY += (mouseY - ringY) * 0.15;
+  ring.style.left = ringX + "px";
+  ring.style.top = ringY + "px";
+  requestAnimationFrame(animate);
+}
+animate();
+function clickEffect() {
+  ring.style.animation = 'none';
+  ring.offsetHeight;
+  ring.style.animation = 'click 0.5s ease-out';
+}
+document.addEventListener('click', clickEffect);
+</script>
+</body>
+</html>

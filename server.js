@@ -3,6 +3,8 @@ const webpush = require("web-push");
 const { cert, initializeApp } = require("firebase-admin/app");
 const { getDatabase } = require("firebase-admin/database");
 const path = require("path");
+const fs = require("fs");
+
 const app = express();
 const dotenv = require("dotenv");
 dotenv.config();
@@ -22,7 +24,26 @@ if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
 if (!FIREBASE_SERVICE_ACCOUNT || !FIREBASE_DATABASE_URL) {
     throw new Error("FIREBASE_SERVICE_ACCOUNT and FIREBASE_DATABASE_URL must be configured in .env");
 }
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+function loadServiceAccount(rawValue) {
+    try {
+        return JSON.parse(rawValue);
+    } catch (error) {
+        const filePath = path.isAbsolute(rawValue) ? rawValue : path.join(__dirname, rawValue);
+
+        if (!fs.existsSync(filePath)) {
+            throw new Error("FIREBASE_SERVICE_ACCOUNT must be valid JSON or a path to the JSON service account file");
+        }
+
+        try {
+            return JSON.parse(fs.readFileSync(filePath, "utf8"));
+        } catch (readError) {
+            throw new Error(`FIREBASE_SERVICE_ACCOUNT file is not valid JSON: ${readError.message}`);
+        }
+    }
+}
+
+const serviceAccount = loadServiceAccount(FIREBASE_SERVICE_ACCOUNT);
 
 initializeApp({
     credential: cert(serviceAccount),
@@ -121,5 +142,5 @@ app.post("/send_notification", async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`server is runing on port http://localhost:${port}`);
+    console.log(`server is running on port http://localhost:${port}`);
 });

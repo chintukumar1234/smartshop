@@ -13,14 +13,14 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, FIREBASE_SERVICE_ACCOUNT_PATH, FIREBASE_DATABASE_URL } = process.env;
+const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, FIREBASE_SERVICE_ACCOUNT, FIREBASE_DATABASE_URL } = process.env;
 
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
     throw new Error("VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY must be configured in .env");
 }
 
-if (!FIREBASE_SERVICE_ACCOUNT_PATH || !FIREBASE_DATABASE_URL) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_PATH and FIREBASE_DATABASE_URL must be configured in .env");
+if (!FIREBASE_SERVICE_ACCOUNT || !FIREBASE_DATABASE_URL) {
+    throw new Error("FIREBASE_SERVICE_ACCOUNT and FIREBASE_DATABASE_URL must be configured in .env");
 }
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 

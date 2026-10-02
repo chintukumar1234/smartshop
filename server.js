@@ -22,7 +22,7 @@ if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
 if (!FIREBASE_SERVICE_ACCOUNT_PATH || !FIREBASE_DATABASE_URL) {
     throw new Error("FIREBASE_SERVICE_ACCOUNT_PATH and FIREBASE_DATABASE_URL must be configured in .env");
 }
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 initializeApp({
     credential: cert(serviceAccount),

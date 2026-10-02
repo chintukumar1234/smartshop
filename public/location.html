@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MapTrack — HD Live Delivery Map</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        bg: '#07090d',
+        surface: '#0f141c',
+        surface2: '#161e2a',
+        surface3: '#1c2535',
+        accent: '#00d4ff',
+        accent2: '#00ff88',
+        danger: '#ff4d6d',
+        warn: '#ffb020',
+        purple: '#a78bfa',
+        ink: '#e8edf2',
+        muted: '#5a6878',
+        muted2: '#8899aa',
+      },
+      fontFamily: {
+        mono: ['"Space Mono"','monospace'],
+        sans: ['"DM Sans"','sans-serif'],
+      },
+      keyframes: {
+        'slide-down': { from:{opacity:0,transform:'translateX(-50%) translateY(-12px)'}, to:{opacity:1,transform:'translateX(-50%) translateY(0)'} },
+        'slide-up-c': { from:{opacity:0,transform:'translateX(-50%) translateY(12px)'}, to:{opacity:1,transform:'translateX(-50%) translateY(0)'} },
+        'slide-in-right': { from:{opacity:0,transform:'translateX(20px)'}, to:{opacity:1,transform:'translateX(0)'} },
+        'modal-in': { from:{opacity:0,transform:'translateY(16px) scale(.97)'}, to:{opacity:1,transform:'none'} },
+        'toast-in': { from:{opacity:0,transform:'translateX(20px)'}, to:{opacity:1,transform:'translateX(0)'} },
+        'load-bar': { '0%':{transform:'scaleX(0) translateX(0)'}, '50%':{transform:'scaleX(.7) translateX(30%)'}, '100%':{transform:'scaleX(0) translateX(100%)'} },
+      },
+      animation: {
+        'slide-down':'slide-down .3s cubic-bezier(0.4,0,0.2,1)',
+        'slide-up-c':'slide-up-c .3s cubic-bezier(0.4,0,0.2,1)',
+        'slide-in-right':'slide-in-right .3s cubic-bezier(0.4,0,0.2,1)',
+        'modal-in':'modal-in .25s cubic-bezier(0.4,0,0.2,1)',
+        'toast-in':'toast-in .3s cubic-bezier(0.4,0,0.2,1)',
+        'load-bar':'load-bar 1.2s ease infinite',
+      }
+    }
+  }
+}
+</script>
+
+<style>
+/* Only what genuinely cannot be a Tailwind utility class:
+   1) third-party library markup we don't author (Leaflet/MarkerCluster/Routing)
+   2) ::-webkit-scrollbar pseudo-elements
+   3) the slider's --pct-driven gradient track, since --pct is set from JS per-element */
+body{overflow:hidden;height:100vh;}
+.leaflet-container{background:#0d1117!important;}
+.leaflet-routing-container{display:none!important;}
+.leaflet-control-zoom{border:none!important;box-shadow:0 4px 20px rgba(0,0,0,.5)!important;}
+.leaflet-control-zoom a{background:#0f141c!important;color:#e8edf2!important;border:1px solid rgba(255,255,255,.12)!important;width:36px!important;height:36px!important;line-height:36px!important;font-size:18px!important;}
+.leaflet-control-zoom a:hover{background:#161e2a!important;color:#00d4ff!important;}
+.leaflet-control-layers{background:#0f141c!important;border:1px solid rgba(255,255,255,.12)!important;color:#e8edf2!important;border-radius:12px!important;box-shadow:0 4px 20px rgba(0,0,0,.4)!important;}
+.leaflet-control-layers label{color:#e8edf2!important;font-family:'DM Sans',sans-serif!important;font-size:13px!important;}
+.marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:rgba(0,212,255,.15)!important;}
+.marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{background:rgba(0,212,255,.35)!important;color:#fff!important;font-family:'DM Sans',sans-serif!important;font-weight:600!important;font-size:13px!important;}
+
+#display_items::-webkit-scrollbar,.cat-list::-webkit-scrollbar,.steps-list::-webkit-scrollbar,.measure-pts-scroll::-webkit-scrollbar{width:4px;}
+#display_items::-webkit-scrollbar-thumb,.cat-list::-webkit-scrollbar-thumb,.steps-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07);border-radius:4px;}
+
+.nearby-slider{-webkit-appearance:none;appearance:none;background:linear-gradient(to right,#00d4ff 0%,#00d4ff var(--pct,10%),rgba(255,255,255,.08) var(--pct,10%));}
+.nearby-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#00d4ff;border:2px solid #0f141c;box-shadow:0 0 0 3px rgba(0,212,255,.25);cursor:pointer;}
+
+.map-measuring,.map-measuring .leaflet-interactive,.map-adding,.map-adding .leaflet-interactive{cursor:crosshair!important;}
+</style>
+</head>
+<body class="font-sans bg-bg text-ink">
+
+<div class="loading-bar hidden [&.active]:block fixed top-0 left-0 right-0 z-[5000] h-0.5 bg-gradient-to-r from-accent to-accent2 animate-load-bar" id="loadingBar"></div>
+<div class="toast-container fixed top-4 right-4 z-[4000] flex flex-col gap-1.5 pointer-events-none" id="toastContainer"></div>
+
+<div class="sidebar-scrim hidden [&.visible]:block fixed inset-0 bg-black/55 z-[1250]" id="sidebarScrim" onclick="toggleSidebar()"></div>
+
+<div class="flex items-stretch h-screen w-full">
+
+  <!-- ════ SIDEBAR ════ -->
+  <aside class="app-sidebar w-[280px] min-w-[280px] h-screen bg-surface border-r border-white/[0.07] flex flex-col overflow-hidden transition-[width,min-width] duration-300 ease-in-out
+    [&.collapsed]:w-0 [&.collapsed]:min-w-0 [&.collapsed]:border-r-0
+    max-md:fixed max-md:top-0 max-md:left-0 max-md:z-[1300] max-md:shadow-[0_0_40px_rgba(0,0,0,.6)] max-md:w-0 max-md:min-w-0
+    max-md:[&.mobile-open]:w-[88vw] max-md:[&.mobile-open]:max-w-[340px] max-md:[&.mobile-open]:min-w-0"
+    id="appSidebar" aria-label="Sidebar navigation">
+    <div class="sidebar-inner w-[280px] max-md:w-[88vw] max-md:max-w-[340px] h-screen flex flex-col overflow-hidden">
+
+      <div class="flex items-center gap-2.5 px-4 pt-[18px] pb-3.5 border-b border-white/[0.07]">
+        <div class="font-mono text-[15px] font-bold text-accent tracking-wide whitespace-nowrap">MAP<span class="text-accent2">TRACK</span></div>
+        <button class="refresh-btn ml-auto flex-shrink-0 flex items-center gap-1.5 h-[30px] px-2.5 rounded-lg border border-white/[0.12] bg-surface2 text-muted2 text-[11px] font-semibold cursor-pointer uppercase tracking-wide whitespace-nowrap transition hover:border-accent hover:text-accent [&.spinning>svg]:rotate-[360deg] [&>svg]:transition-transform [&>svg]:duration-500" id="refreshBtn" onclick="manualRefresh()">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>Refresh
+        </button>
+      </div>
+
+      <!-- Geocoding Search Bar -->
+      <div class="px-4 pt-3.5 pb-2 border-b border-white/[0.07]">
+        <div class="relative flex items-center gap-2">
+          <input class="geocode-input flex-1 h-10 rounded-full border-[1.5px] border-white/[0.12] bg-surface2 text-ink px-4 pr-10 text-sm outline-none transition focus:border-accent focus:shadow-[0_0_0_3px_rgba(0,212,255,.08)] placeholder:text-muted" id="geocodeInput" placeholder="🔍 Search any location…" onkeydown="if(event.key==='Enter')doGeocode()" oninput="debounceGeocode()"/>
+          <button class="absolute right-1.5 w-[30px] h-[30px] rounded-full border-none bg-accent text-black cursor-pointer flex items-center justify-center transition-transform hover:scale-105" onclick="doGeocode()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+          <div class="geocode-results absolute top-12 left-0 right-0 bg-surface border border-white/[0.12] rounded-xl z-10 max-h-[220px] overflow-y-auto shadow-2xl empty:hidden" id="geocodeResults"></div>
+        </div>
+      </div>
+
+      <!-- Map Layer Switcher -->
+      <div class="layer-bar flex gap-1.5 px-4 py-2.5 border-b border-white/[0.07] overflow-x-auto [&::-webkit-scrollbar]:hidden">
+        <button class="ltab text-[11px] font-semibold tracking-wide px-3 py-1 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition whitespace-nowrap flex items-center gap-1 hover:not-[.active]:border-white/[0.12] hover:not-[.active]:text-ink [&.active]:bg-accent/10 [&.active]:border-accent [&.active]:text-accent active" onclick="setLayer('street',this)">🗺 Street</button>
+        <button class="ltab text-[11px] font-semibold tracking-wide px-3 py-1 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition whitespace-nowrap flex items-center gap-1 hover:not-[.active]:border-white/[0.12] hover:not-[.active]:text-ink [&.active]:bg-accent/10 [&.active]:border-accent [&.active]:text-accent" onclick="setLayer('satellite',this)">🛰 Satellite HD</button>
+        <button class="ltab text-[11px] font-semibold tracking-wide px-3 py-1 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition whitespace-nowrap flex items-center gap-1 hover:not-[.active]:border-white/[0.12] hover:not-[.active]:text-ink [&.active]:bg-accent/10 [&.active]:border-accent [&.active]:text-accent" onclick="setLayer('hybrid',this)">🏙 Hybrid</button>
+        <button class="ltab text-[11px] font-semibold tracking-wide px-3 py-1 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition whitespace-nowrap flex items-center gap-1 hover:not-[.active]:border-white/[0.12] hover:not-[.active]:text-ink [&.active]:bg-accent/10 [&.active]:border-accent [&.active]:text-accent" onclick="setLayer('topo',this)">🏔 Topo</button>
+        <button class="ltab text-[11px] font-semibold tracking-wide px-3 py-1 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition whitespace-nowrap flex items-center gap-1 hover:not-[.active]:border-white/[0.12] hover:not-[.active]:text-ink [&.active]:bg-accent/10 [&.active]:border-accent [&.active]:text-accent" onclick="setLayer('dark',this)">🌑 Dark</button>
+      </div>
+
+      <div class="px-3 py-2.5 border-b border-white/[0.07]">
+        <div class="grid grid-cols-2 md:flex gap-1.5 flex-wrap">
+          <button class="action-btn flex-1 min-w-[56px] h-9 rounded-lg border border-white/[0.07] bg-surface2 text-ink text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition whitespace-nowrap hover:border-accent hover:bg-accent/[0.06] hover:-translate-y-px" onclick="showUpload()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Add
+          </button>
+          <button class="action-btn flex-1 min-w-[56px] h-9 rounded-lg border border-white/[0.07] bg-surface2 text-ink text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition whitespace-nowrap hover:border-danger hover:bg-danger/[0.06] hover:-translate-y-px" onclick="showDelete()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Delete
+          </button>
+          <button class="action-btn flex-1 min-w-[56px] h-9 rounded-lg border border-white/[0.07] bg-surface2 text-ink text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition whitespace-nowrap hover:border-accent hover:bg-accent/[0.06] hover:-translate-y-px" onclick="g()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Pay
+          </button>
+          <button class="action-btn flex-1 min-w-[56px] h-9 rounded-lg border border-white/[0.07] bg-surface2 text-ink text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition whitespace-nowrap hover:border-accent2 hover:bg-accent2/[0.06] hover:text-accent2 hover:-translate-y-px" onclick="routeAll()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M6 17V7a2 2 0 0 1 2-2h8"/><polyline points="14 3 18 7 14 11"/></svg>Route All
+          </button>
+          <button class="action-btn flex-1 min-w-[56px] h-9 rounded-lg border border-white/[0.07] bg-surface2 text-ink text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition whitespace-nowrap hover:border-accent hover:bg-accent/[0.06] hover:-translate-y-px" onclick="window.openCatModal()" title="Manage categories">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="6" height="6" rx="1"/><rect x="9" y="3" width="6" height="6" rx="1"/><rect x="16" y="3" width="6" height="6" rx="1"/><rect x="2" y="11" width="6" height="6" rx="1"/><rect x="9" y="11" width="6" height="6" rx="1"/><rect x="16" y="11" width="6" height="6" rx="1"/></svg>Groups
+          </button>
+          <button class="action-btn flex-1 min-w-[56px] h-9 rounded-lg border border-white/[0.07] bg-surface2 text-ink text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition whitespace-nowrap hover:border-purple hover:bg-purple/[0.06] hover:text-purple hover:-translate-y-px" onclick="openMeasureModal()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="8" x2="2" y2="16"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="22" y1="8" x2="22" y2="16"/></svg>Measure
+          </button>
+          <button class="action-btn flex-1 min-w-[56px] h-9 rounded-lg border border-white/[0.07] bg-surface2 text-ink text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 transition whitespace-nowrap hover:border-warn hover:bg-warn/[0.06] hover:text-warn hover:-translate-y-px" onclick="exportCSV()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Delivery search -->
+      <div class="px-3 pt-2 pb-1">
+        <div class="relative">
+          <svg class="absolute left-[9px] top-1/2 -translate-y-1/2 text-muted pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" class="w-full h-9 rounded-lg border border-white/[0.07] bg-surface2 text-ink pl-8 pr-3 text-[13px] outline-none transition focus:border-accent placeholder:text-muted" id="searchInput" placeholder="Filter delivery points…" oninput="applyFilter()"/>
+        </div>
+      </div>
+
+      <div class="flex gap-1 px-3 pt-1.5 pb-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+        <button class="ftab text-[11px] font-semibold tracking-wide px-2.5 py-1 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition whitespace-nowrap hover:not-[.active]:border-white/[0.12] hover:not-[.active]:text-ink [&.active]:bg-accent/10 [&.active]:border-accent [&.active]:text-accent active" onclick="setFilter('all',this)">All</button>
+        <button class="ftab text-[11px] font-semibold tracking-wide px-2.5 py-1 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition whitespace-nowrap hover:not-[.active]:border-white/[0.12] hover:not-[.active]:text-ink [&.active]:bg-accent/10 [&.active]:border-accent [&.active]:text-accent" onclick="setFilter('nearby',this)">📍 Nearby</button>
+      </div>
+
+      <!-- Group / Category filter bar -->
+      <div class="group-filter-bar px-3 pt-1.5 pb-2 border-b border-white/[0.07] overflow-x-auto flex gap-1.5 flex-wrap [&::-webkit-scrollbar]:hidden" id="groupFilterBar"></div>
+
+      <div class="nearby-bar hidden [&.visible]:flex flex-col gap-2 px-4 pt-2.5 pb-3 border-b border-white/[0.07]" id="nearbyBar">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-semibold tracking-wide text-muted uppercase">Max distance</span>
+          <span class="font-mono text-[13px] font-bold text-accent bg-accent/[0.08] border border-accent/20 rounded-lg px-2.5 py-0.5" id="nearbyDistChip">5 km</span>
+        </div>
+        <input type="range" class="nearby-slider w-full h-1 rounded outline-none cursor-pointer" id="nearbySlider" min="0.5" max="50" step="0.5" value="5" oninput="onNearbySlider(this)"/>
+        <div class="flex gap-1.5 flex-wrap">
+          <button class="npreset text-[10px] font-semibold px-2.5 py-0.5 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition hover:border-accent hover:text-accent hover:bg-accent/[0.08] [&.active]:border-accent [&.active]:text-accent [&.active]:bg-accent/[0.08]" onclick="setNearbyPreset(1)">1 km</button>
+          <button class="npreset text-[10px] font-semibold px-2.5 py-0.5 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition hover:border-accent hover:text-accent hover:bg-accent/[0.08] [&.active]:border-accent [&.active]:text-accent [&.active]:bg-accent/[0.08] active" onclick="setNearbyPreset(5)">5 km</button>
+          <button class="npreset text-[10px] font-semibold px-2.5 py-0.5 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition hover:border-accent hover:text-accent hover:bg-accent/[0.08] [&.active]:border-accent [&.active]:text-accent [&.active]:bg-accent/[0.08]" onclick="setNearbyPreset(10)">10 km</button>
+          <button class="npreset text-[10px] font-semibold px-2.5 py-0.5 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition hover:border-accent hover:text-accent hover:bg-accent/[0.08] [&.active]:border-accent [&.active]:text-accent [&.active]:bg-accent/[0.08]" onclick="setNearbyPreset(25)">25 km</button>
+          <button class="npreset text-[10px] font-semibold px-2.5 py-0.5 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer transition hover:border-accent hover:text-accent hover:bg-accent/[0.08] [&.active]:border-accent [&.active]:text-accent [&.active]:bg-accent/[0.08]" onclick="setNearbyPreset(50)">50 km</button>
+        </div>
+        <div class="text-[11px] text-muted">Showing <span class="font-mono text-accent2 font-bold" id="nearbyCount">—</span> within <span class="font-mono text-accent2 font-bold" id="nearbyDistInline">5 km</span> · nearest first</div>
+      </div>
+
+      <div class="px-4 pt-3 pb-1.5 text-[10px] font-semibold tracking-[1.5px] text-muted uppercase flex items-center justify-between">
+        Delivery Points
+        <span class="font-mono text-[10px] text-accent bg-accent/[0.08] border border-accent/[0.15] rounded-full px-1.5 py-0.5" id="listCount">0</span>
+      </div>
+
+      <div id="confirmBox" class="confirm-box fixed inset-0 z-[3000] bg-black/60 backdrop-blur-md hidden items-center justify-center" style="display:none;">
+        <div class="bg-surface border border-white/[0.12] rounded-2xl p-6 w-[300px] shadow-2xl flex flex-col items-center gap-4 animate-modal-in">
+          <p class="font-mono text-xs tracking-wide text-ink text-center">Delete this delivery point?</p>
+          <div class="flex gap-2.5 w-full">
+            <button id="yesBtn" class="flex-1 h-9 rounded-lg border-none font-sans text-[13px] font-semibold cursor-pointer transition bg-gradient-to-br from-danger to-[#cc2244] text-white">Delete</button>
+            <button id="noBtn" class="flex-1 h-9 rounded-lg border border-white/[0.07] font-sans text-[13px] font-semibold cursor-pointer transition bg-surface2 text-ink">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="display_items" class="flex-1 overflow-y-auto px-2.5 pt-1 pb-3 flex flex-col gap-1.5"></div>
+
+      <div class="flex items-center gap-2.5 px-3.5 py-3 border-t border-white/[0.07]">
+        <div class="gps-dot w-2.5 h-2.5 rounded-full bg-muted flex-shrink-0 [&.live]:bg-accent2 [&.live]:shadow-[0_0_0_4px_rgba(0,255,136,.18)]" id="gpsDot"></div>
+        <div>
+          <div class="text-xs text-muted2" id="gpsText">Locating…</div>
+          <div class="text-[10px] text-muted">Live GPS status</div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ════ MAIN ════ -->
+  <div class="flex-1 min-w-0 h-screen flex flex-col relative max-md:w-screen">
+
+    <header class="h-16 min-h-16 flex items-center gap-3.5 px-[18px] bg-surface border-b border-white/[0.07] z-[950] max-md:px-2.5 max-md:gap-2">
+      <button class="w-9 h-9 rounded-lg bg-transparent border border-white/[0.12] cursor-pointer flex items-center justify-center text-ink transition flex-shrink-0 hover:border-accent hover:text-accent max-md:w-[38px] max-md:h-[38px]" id="sidebarToggleBtn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M.13 17.05a1.41 1.41 0 0 1 1.41-1.41H10a1.41 1.41 0 1 1 0 2.82H1.54a1.41 1.41 0 0 1-1.41-1.41zm0-14.1a1.41 1.41 0 0 1 1.41-1.41h16.92a1.41 1.41 0 1 1 0 2.82H1.54A1.41 1.41 0 0 1 .13 2.95zm0 7.05a1.41 1.41 0 0 1 1.41-1.41h16.92a1.41 1.41 0 1 1 0 2.82H1.54A1.41 1.41 0 0 1 .13 10z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+      <h1 class="font-mono text-[15px] font-bold tracking-wide text-ink max-md:text-xs max-md:whitespace-nowrap max-md:overflow-hidden max-md:text-ellipsis max-[420px]:hidden">MAP<span class="text-accent">TRACK</span> — HD Live Delivery Map</h1>
+      <div class="flex items-center gap-2 ml-auto max-md:gap-1.5">
+        <button class="header-icon-btn group relative w-[38px] h-[38px] rounded-lg border border-white/[0.12] bg-surface2 text-muted2 cursor-pointer flex items-center justify-center transition hover:border-accent hover:text-accent [&.active]:border-accent2 [&.active]:text-accent2 [&.active]:bg-accent2/[0.08] max-md:w-[34px] max-md:h-[34px]" onclick="toggleHeatmap(this)" title="Heatmap" id="heatBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2c2.5 4 4 7 4 10a4 4 0 0 1-8 0c0-3 1.5-6 4-10z"/></svg>
+          <span class="absolute top-11 right-0 bg-surface border border-white/[0.12] rounded-lg px-2.5 py-1 text-[11px] whitespace-nowrap pointer-events-none opacity-0 transition group-hover:opacity-100 max-md:hidden">Heatmap</span>
+        </button>
+        <button class="header-icon-btn group relative w-[38px] h-[38px] rounded-lg border border-white/[0.12] bg-surface2 text-muted2 cursor-pointer flex items-center justify-center transition hover:border-accent hover:text-accent [&.active]:border-accent2 [&.active]:text-accent2 [&.active]:bg-accent2/[0.08] max-md:w-[34px] max-md:h-[34px]" onclick="toggleAddMode(this)" id="addModeBtn" title="Click to add">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 1 8 8c0 5-8 12-8 12S4 15 4 10a8 8 0 0 1 8-8z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="10" y1="10" x2="14" y2="10"/></svg>
+          <span class="absolute top-11 right-0 bg-surface border border-white/[0.12] rounded-lg px-2.5 py-1 text-[11px] whitespace-nowrap pointer-events-none opacity-0 transition group-hover:opacity-100 max-md:hidden">Click to add point</span>
+        </button>
+        <button class="header-icon-btn group relative w-[38px] h-[38px] rounded-lg border border-white/[0.12] bg-surface2 text-muted2 cursor-pointer flex items-center justify-center transition hover:border-accent hover:text-accent max-md:w-[34px] max-md:h-[34px]" onclick="flyToUser()" title="My location">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L12 22M2 12L22 12"/><circle cx="12" cy="12" r="4"/></svg>
+          <span class="absolute top-11 right-0 bg-surface border border-white/[0.12] rounded-lg px-2.5 py-1 text-[11px] whitespace-nowrap pointer-events-none opacity-0 transition group-hover:opacity-100 max-md:hidden">My location</span>
+        </button>
+        <button class="header-icon-btn group relative w-[38px] h-[38px] rounded-lg border border-white/[0.12] bg-surface2 text-muted2 cursor-pointer flex items-center justify-center transition hover:border-accent hover:text-accent max-md:w-[34px] max-md:h-[34px]" onclick="toggleFullscreen()" title="Fullscreen">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="fsIcon"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          <span class="absolute top-11 right-0 bg-surface border border-white/[0.12] rounded-lg px-2.5 py-1 text-[11px] whitespace-nowrap pointer-events-none opacity-0 transition group-hover:opacity-100 max-md:hidden">Fullscreen</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="map-wrap relative flex-1 min-h-0">
+      <!-- Click-to-add banner -->
+      <div class="click-add-banner hidden [&.visible]:block absolute top-4 left-1/2 -translate-x-1/2 bg-accent2/[0.12] border border-accent2 rounded-full py-[7px] px-[18px] text-xs text-accent2 z-[900] animate-slide-down whitespace-nowrap font-semibold tracking-wide max-md:left-2 max-md:right-2 max-md:translate-x-0 max-md:w-auto max-md:text-center max-md:text-[11px] max-md:whitespace-normal max-md:top-2.5" id="clickAddBanner">📍 Click anywhere on the map to place a delivery point — Press Esc to cancel</div>
+
+      <!-- Heatmap legend -->
+      <div class="heat-legend hidden [&.visible]:flex absolute bottom-5 left-1/2 -translate-x-1/2 bg-surface border border-white/[0.12] rounded-full py-1.5 px-4 items-center gap-2.5 z-[850] text-[11px] text-muted shadow-xl max-md:left-2 max-md:right-2 max-md:translate-x-0 max-md:w-auto max-md:justify-center" id="heatLegend">
+        <span>Low</span><div class="w-20 h-2 rounded" style="background:linear-gradient(to right,blue,cyan,lime,yellow,red)"></div><span>High</span><span class="ml-1 text-warn">Delivery Density</span>
+      </div>
+
+      <!-- Floating Measure Bar -->
+      <div id="measureFloatBar" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-[1200] bg-[rgba(15,20,28,0.97)] border border-purple rounded-full py-2 px-5 items-center gap-3.5 shadow-[0_6px_28px_rgba(167,139,250,0.25)] whitespace-nowrap max-md:left-2 max-md:right-2 max-md:translate-x-0 max-md:w-auto max-md:justify-center max-md:flex-wrap max-md:gap-2 max-md:top-2.5">
+        <span class="text-[11px] text-purple font-bold tracking-wide uppercase">📐 MEASURING</span>
+        <div class="w-px h-5 bg-white/10"></div>
+        <div class="flex flex-col items-center">
+          <span class="font-mono text-sm font-bold text-accent2" id="mfDist">—</span>
+          <span class="text-[9px] text-muted tracking-wide uppercase">Distance</span>
+        </div>
+        <div class="w-px h-5 bg-white/10"></div>
+        <div class="flex flex-col items-center">
+          <span class="font-mono text-sm font-bold text-purple" id="mfPts">0</span>
+          <span class="text-[9px] text-muted tracking-wide uppercase">Points</span>
+        </div>
+        <button onclick="window.toggleMeasureActive()" class="h-[30px] px-3.5 rounded-full border-none bg-danger text-white font-sans text-xs font-bold cursor-pointer ml-1">Stop ■</button>
+      </div>
+
+      <div id="map" class="h-full w-full"></div>
+
+      <!-- Route bar -->
+      <div class="route-bar hidden [&.visible]:flex absolute bottom-5 left-1/2 -translate-x-1/2 bg-[rgba(15,20,28,.96)] backdrop-blur-md border border-accent2 rounded-full py-2 px-5 items-center gap-3.5 z-[900] shadow-[0_6px_28px_rgba(0,255,136,.15)] text-[13px] whitespace-nowrap animate-slide-up-c max-md:left-2 max-md:right-2 max-md:translate-x-0 max-md:flex-wrap max-md:justify-center max-md:rounded-[20px] max-md:py-2.5 max-md:px-3.5" id="routeBar">
+        <div class="flex flex-col items-center gap-px"><span class="font-mono text-sm font-bold text-accent2" id="rb-dist">—</span><span class="text-[9px] text-muted tracking-wide uppercase">Distance</span></div>
+        <div class="w-px h-6 bg-white/[0.07]"></div>
+        <div class="flex flex-col items-center gap-px"><span class="font-mono text-sm font-bold text-accent2" id="rb-time">—</span><span class="text-[9px] text-muted tracking-wide uppercase">Est. Time</span></div>
+        <div class="w-px h-6 bg-white/[0.07]"></div>
+        <div class="flex flex-col items-center gap-px"><span class="font-mono text-sm font-bold text-accent2" id="rb-stops">—</span><span class="text-[9px] text-muted tracking-wide uppercase">Stops</span></div>
+        <button class="w-6 h-6 rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer text-[13px] flex items-center justify-center transition hover:border-danger hover:text-danger ml-1" onclick="clearRouteAll()">✕</button>
+      </div>
+
+      <!-- Turn-by-turn steps panel -->
+      <div class="steps-panel hidden [&.visible]:flex absolute bottom-5 right-4 z-[900] bg-surface border border-white/[0.12] rounded-2xl w-[180px] max-h-40 shadow-2xl flex-col overflow-hidden animate-slide-in-right max-md:right-2 max-md:left-2 max-md:w-auto max-md:max-h-[34vh] max-md:bottom-3 max-md:top-auto max-[420px]:max-h-[30vh]" id="stepsPanel">
+        <div class="flex items-center justify-between px-3.5 py-3 border-b border-white/[0.07]">
+          <span class="text-xs font-semibold text-accent2 tracking-wide uppercase">Turn-by-Turn</span>
+          <button class="w-6 h-6 rounded-full border-none bg-transparent text-muted cursor-pointer text-[13px] flex items-center justify-center transition hover:text-danger" onclick="closeSteps()">✕</button>
+        </div>
+        <div class="flex gap-4 px-3.5 py-2.5 bg-accent2/[0.04] border-b border-white/[0.07]">
+          <div class="flex flex-col items-center gap-px"><span class="font-mono text-sm font-bold text-accent2" id="sp-dist">—</span><span class="text-[10px] text-muted tracking-wide uppercase">Distance</span></div>
+          <div class="flex flex-col items-center gap-px"><span class="font-mono text-sm font-bold text-accent2" id="sp-time">—</span><span class="text-[10px] text-muted tracking-wide uppercase">Est. Time</span></div>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2" id="stepsList"></div>
+      </div>
+
+      <!-- Pin info panel -->
+      <div class="info-panel hidden [&.visible]:block absolute bottom-5 left-1/2 -translate-x-1/2 z-[900] bg-surface border border-white/[0.12] rounded-2xl p-4 pt-4 min-w-[300px] max-w-[420px] shadow-2xl animate-slide-up-c max-md:left-2 max-md:right-2 max-md:translate-x-0 max-md:bottom-3 max-md:min-w-0 max-md:max-w-none max-md:p-3.5" id="infoPanel">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div class="text-base font-semibold text-ink" id="infoPinName">—</div>
+            <div class="font-mono text-[10px] text-muted mt-0.5" id="infoPinCoords">—</div>
+          </div>
+          <button class="w-[26px] h-[26px] rounded-full border border-white/[0.07] bg-transparent text-muted cursor-pointer text-sm flex-shrink-0 flex items-center justify-center transition hover:border-danger hover:text-danger" onclick="closeInfoPanel()">✕</button>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-muted2 py-1 border-b border-white/[0.07]">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="text-accent flex-shrink-0" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2c2.5 4 4 7 4 10"/></svg>
+          <span id="infoDistTxt">—</span>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button class="flex-1 h-9 rounded-lg border border-white/[0.07] bg-surface2 text-ink text-xs font-medium cursor-pointer transition flex items-center justify-center gap-1.5 hover:border-accent hover:text-accent" onclick="infoCopyCoords()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy coords
+          </button>
+          <button class="flex-1 h-9 rounded-lg border border-accent bg-accent text-black text-xs font-medium cursor-pointer transition flex items-center justify-center gap-1.5 hover:opacity-90" id="infoRouteBtn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 8 14 12"/><path d="M2 12h16"/></svg>
+            Navigate
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MEASURE MODAL -->
+<div class="modal-overlay hidden [&.open]:flex fixed inset-0 z-[2000] bg-black/65 backdrop-blur items-center justify-center" id="measureModal">
+  <div class="bg-surface border border-purple/[0.35] rounded-2xl p-[22px] w-[360px] shadow-2xl animate-modal-in flex flex-col gap-3 max-md:w-[92vw] max-md:max-w-[360px] max-md:p-[18px]">
+    <div class="text-xs tracking-wide text-purple flex items-center justify-between">📐 MEASURE DISTANCE <button class="w-[26px] h-[26px] rounded-lg border border-white/[0.07] bg-transparent text-muted cursor-pointer text-sm flex items-center justify-center transition hover:border-danger hover:text-danger" onclick="closeMeasureModal()">✕</button></div>
+    <div class="flex items-start gap-2 py-[9px] px-3 bg-purple/[0.05] border border-purple/[0.15] rounded-lg text-xs text-purple/90 leading-relaxed">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="flex-shrink-0 mt-px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span id="measureHintTxt">Press <b>Start</b> then click points on the map.</span>
+    </div>
+    <div class="grid grid-cols-2 gap-[7px]">
+      <div class="bg-surface2 border border-white/[0.07] rounded-lg py-[9px] px-[11px]"><div class="text-[10px] text-muted tracking-wide uppercase">Total Distance</div><div class="font-mono text-sm font-bold text-accent2" id="mTotalDist">—</div></div>
+      <div class="bg-surface2 border border-white/[0.07] rounded-lg py-[9px] px-[11px]"><div class="text-[10px] text-muted tracking-wide uppercase">Last Segment</div><div class="font-mono text-sm font-bold text-accent2" id="mLastSeg">—</div></div>
+      <div class="bg-surface2 border border-white/[0.07] rounded-lg py-[9px] px-[11px]"><div class="text-[10px] text-muted tracking-wide uppercase">Points</div><div class="font-mono text-sm font-bold text-accent2" id="mPtCount">0</div></div>
+      <div class="bg-surface2 border border-white/[0.07] rounded-lg py-[9px] px-[11px]"><div class="text-[10px] text-muted tracking-wide uppercase">Avg Segment</div><div class="font-mono text-sm font-bold text-accent2" id="mAvgSeg">—</div></div>
+    </div>
+    <div class="measure-pts-scroll max-h-[100px] overflow-y-auto flex flex-col gap-[3px]" id="measurePtsList"></div>
+    <div class="flex gap-2">
+      <button class="flex-1 h-[38px] rounded-lg border-none font-sans text-[13px] font-semibold cursor-pointer flex items-center justify-center gap-1.5 transition bg-gradient-to-br from-purple to-[#7c3aed] text-white [&.stop]:from-danger [&.stop]:to-[#cc2244]" id="measureToggleBtn" onclick="toggleMeasureActive()">▶ Start</button>
+      <button class="flex-none w-[70px] h-[38px] rounded-lg border border-white/[0.07] font-sans text-[13px] font-semibold cursor-pointer transition bg-surface2 text-muted" onclick="clearMeasure()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Categories Modal -->
+<div class="modal-overlay hidden [&.open]:flex fixed inset-0 z-[2000] bg-black/65 backdrop-blur items-center justify-center" id="catModal">
+  <div class="bg-surface border border-white/[0.12] rounded-2xl p-6 w-[380px] max-h-[88vh] overflow-y-auto shadow-2xl animate-modal-in flex flex-col gap-3.5 max-md:w-[92vw] max-md:max-w-[360px] max-md:p-[18px]">
+    <div class="text-xs tracking-wide text-purple flex items-center justify-between">🗂 MANAGE GROUPS <button class="w-[26px] h-[26px] rounded-lg border border-white/[0.07] bg-transparent text-muted cursor-pointer text-sm flex items-center justify-center transition hover:border-danger hover:text-danger" onclick="closeModal('catModal')">✕</button></div>
+
+    <div class="cat-list flex flex-col gap-1.5 max-h-[240px] overflow-y-auto" id="catList"></div>
+
+    <div class="text-[10px] font-bold tracking-wide text-muted uppercase mt-1">New Group</div>
+    <div class="flex gap-1.5 items-center">
+      <div class="relative">
+        <div class="w-[34px] h-[34px] rounded-lg border border-white/[0.12] cursor-pointer flex items-center justify-center text-base transition hover:border-accent" id="newCatColorThumb" onclick="toggleColorPicker()" style="background:#00d4ff;"></div>
+        <div class="color-picker-popup hidden [&.open]:grid absolute top-[38px] left-0 z-10 bg-surface border border-white/[0.12] rounded-xl p-2 gap-[5px] w-40 shadow-2xl grid-cols-6" id="colorPickerPopup"></div>
+      </div>
+      <input type="text" id="newCatName" class="flex-1 h-10 rounded-lg border border-white/[0.07] bg-surface2 text-ink px-3 text-[13px] outline-none transition focus:border-accent" placeholder="Group name e.g. Zone A"/>
+      <button onclick="window.addCategory()" class="h-10 px-3.5 rounded-lg border-none bg-accent text-black font-sans text-[13px] font-bold cursor-pointer">Add</button>
+    </div>
+    <div class="text-xs min-h-4 mt-0.5 text-danger" id="cat_msg"></div>
+
+    <div class="text-[11px] text-muted leading-relaxed border-t border-white/[0.07] pt-2.5">
+      Assign groups when adding points via the map. Markers will be color-coded and you can filter by group in the sidebar.
+    </div>
+  </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal-overlay hidden [&.open]:flex fixed inset-0 z-[2000] bg-black/65 backdrop-blur items-center justify-center" id="uploadModal">
+  <div class="bg-surface border border-white/[0.12] rounded-2xl p-6 w-[340px] shadow-2xl animate-modal-in max-md:w-[92vw] max-md:max-w-[360px] max-md:p-[18px]">
+    <div class="text-xs tracking-wide text-accent mb-[18px] flex items-center justify-between">ADD ITEM <button class="w-[26px] h-[26px] rounded-lg border border-white/[0.07] bg-transparent text-muted cursor-pointer text-sm flex items-center justify-center transition hover:border-danger hover:text-danger" onclick="closeModal('uploadModal')">✕</button></div>
+    <div class="flex flex-col gap-2.5">
+      <div class="flex flex-col gap-1"><div class="text-[10px] font-semibold tracking-wide text-muted uppercase">Image</div><input type="file" id="images" class="h-auto py-2 px-3 rounded-lg border border-white/[0.07] bg-surface2 text-ink text-[13px] outline-none cursor-pointer transition focus:border-accent" accept="image/*"/></div>
+      <div class="flex flex-col gap-1"><div class="text-[10px] font-semibold tracking-wide text-muted uppercase">Item Name</div><input type="text" id="names" class="h-10 rounded-lg border border-white/[0.07] bg-surface2 text-ink px-3 text-[13px] outline-none transition focus:border-accent" placeholder="e.g. Package #001"/></div>
+      <div class="flex flex-col gap-1"><div class="text-[10px] font-semibold tracking-wide text-muted uppercase">Amount</div><input type="number" id="numbers" class="h-10 rounded-lg border border-white/[0.07] bg-surface2 text-ink px-3 text-[13px] outline-none transition focus:border-accent" placeholder="e.g. 250"/></div>
+      <div class="text-xs min-h-4 mt-0.5 text-danger" id="upload_msg"></div>
+      <button class="w-full h-[42px] rounded-xl border-none bg-gradient-to-br from-accent to-[#0099cc] text-black font-sans text-sm font-semibold cursor-pointer mt-1 transition hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(0,212,255,.3)]" onclick="chintu()">Upload Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal-overlay hidden [&.open]:flex fixed inset-0 z-[2000] bg-black/65 backdrop-blur items-center justify-center" id="deleteModal">
+  <div class="bg-surface border border-white/[0.12] rounded-2xl p-6 w-[340px] shadow-2xl animate-modal-in max-md:w-[92vw] max-md:max-w-[360px] max-md:p-[18px]">
+    <div class="text-xs tracking-wide text-accent mb-[18px] flex items-center justify-between">DELETE ITEM <button class="w-[26px] h-[26px] rounded-lg border border-white/[0.07] bg-transparent text-muted cursor-pointer text-sm flex items-center justify-center transition hover:border-danger hover:text-danger" onclick="closeModal('deleteModal')">✕</button></div>
+    <div class="flex flex-col gap-2.5">
+      <div class="flex flex-col gap-1"><div class="text-[10px] font-semibold tracking-wide text-muted uppercase">Item Name</div><input type="text" id="nam" class="h-10 rounded-lg border border-white/[0.07] bg-surface2 text-ink px-3 text-[13px] outline-none transition focus:border-accent" placeholder="Enter exact name"/></div>
+      <div class="flex flex-col gap-1"><div class="text-[10px] font-semibold tracking-wide text-muted uppercase">Amount</div><input type="number" id="amu" class="h-10 rounded-lg border border-white/[0.07] bg-surface2 text-ink px-3 text-[13px] outline-none transition focus:border-accent" placeholder="Enter exact amount"/></div>
+      <div class="text-xs min-h-4 mt-0.5 text-danger" id="delete_msg"></div>
+      <button class="w-full h-[42px] rounded-xl border-none bg-gradient-to-br from-danger to-[#cc2244] text-white font-sans text-sm font-semibold cursor-pointer mt-1 transition hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(0,212,255,.3)]" onclick="delete_btn()">Delete Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- Click-on-map Add Point Modal -->
+<div class="modal-overlay hidden [&.open]:flex fixed inset-0 z-[2000] bg-black/65 backdrop-blur items-center justify-center" id="addPointModal">
+  <div class="bg-surface border border-accent2 rounded-2xl p-[22px] w-80 shadow-2xl animate-modal-in flex flex-col gap-3 max-md:w-[92vw] max-md:max-w-[360px] max-md:p-[18px]">
+    <div class="text-xs tracking-wide text-accent2 flex items-center justify-between">📍 ADD DELIVERY POINT <button class="w-[26px] h-[26px] rounded-lg border border-white/[0.07] bg-transparent text-muted cursor-pointer text-sm flex items-center justify-center transition hover:border-danger hover:text-danger" onclick="closeModal('addPointModal')">✕</button></div>
+    <div class="font-mono text-[11px] text-muted2 bg-surface2 border border-white/[0.07] rounded-lg py-2 px-3 tracking-wide" id="addPointCoords">—</div>
+    <div class="flex flex-col gap-2.5">
+      <div class="flex flex-col gap-1"><div class="text-[10px] font-semibold tracking-wide text-muted uppercase">Name</div><input type="text" id="addPointName" class="h-10 rounded-lg border border-white/[0.07] bg-surface2 text-ink px-3 text-[13px] outline-none transition focus:border-accent" placeholder="e.g. Customer #42"/></div>
+      <div class="flex flex-col gap-1"><div class="text-[10px] font-semibold tracking-wide text-muted uppercase">Category</div>
+        <select id="addPointCat" class="h-10 rounded-lg border border-white/[0.07] bg-surface2 text-ink px-3 text-[13px] outline-none w-full transition focus:border-accent"><option value="">— No category —</option></select>
+      </div>
+      <div class="text-xs min-h-4 mt-0.5 text-danger" id="addpoint_msg"></div>
+      <button class="w-full h-[42px] rounded-xl border-none bg-gradient-to-br from-accent2 to-[#00cc66] text-black font-sans text-sm font-semibold cursor-pointer mt-1 transition hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(0,212,255,.3)]" onclick="saveClickedPoint()">Save Point</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal-overlay hidden [&.open]:flex fixed inset-0 z-[2000] bg-black/65 backdrop-blur items-center justify-center" id="paymentModal">
+  <div class="bg-surface border border-white/[0.12] rounded-2xl p-6 w-[260px] shadow-2xl animate-modal-in flex flex-col items-center gap-4 max-md:w-[92vw] max-md:max-w-[360px] max-md:p-[18px]">
+    <div class="text-xs tracking-wide text-accent w-full flex items-center justify-between">PAYMENT <button class="w-[26px] h-[26px] rounded-lg border border-white/[0.07] bg-transparent text-muted cursor-pointer text-sm flex items-center justify-center transition hover:border-danger hover:text-danger" onclick="closePayment()">✕</button></div>
+    <button class="w-full h-10 rounded-xl border border-accent bg-accent/[0.08] text-accent font-sans text-[13px] font-semibold cursor-pointer flex items-center justify-center gap-1.5 transition hover:bg-accent/[0.18]" id="qrToggleBtn" onclick="toggleQR()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Show QR Code
+    </button>
+    <div id="qrWrapper" class="hidden [&.visible]:flex flex-col items-center gap-2"><div id="payQrCanvas" class="bg-white rounded-[10px] p-2"></div><div class="text-[11px] text-muted tracking-wide uppercase">Scan to pay</div></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getDatabase, ref, get, onValue, remove, push, set }
+  from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+
+const firebaseConfig={
+  apiKey:"AIzaSyAVWLIDjsmMcH2kfqiKwQ1-jFU6d6654pY",
+  authDomain:"myproject-fdb4c.firebaseapp.com",
+  databaseURL:"https://myproject-fdb4c-default-rtdb.firebaseio.com",
+  projectId:"myproject-fdb4c",
+  storageBucket:"myproject-fdb4c.firebasestorage.app",
+  messagingSenderId:"600134367178",
+  appId:"1:600134367178:web:ea8b0daa3928c7791c8133"
+};
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
+
+/* ── State ── */
+let userLat=null,userLng=null,userMarker=null,accuracyCircle=null;
+let routingControl=null,routeAllControl=null;
+let qrGenerated=false,qrVisible=false;
+let currentFilter='all',currentSearch='';
+let nearbyMaxKm=5;
+let allNodes=[];
+let mapMarkers={};
+let measureActive=false,measurePoints=[],measurePolyline=null,measureMarkers=[];
+let heatLayer=null,heatVisible=false;
+let addMode=false,pendingLatLng=null;
+let currentInfoLat=null,currentInfoLng=null,currentInfoName=null;
+let geocodeTimer=null;
+let currentGroupFilter='__all__';
+
+/* ── Category system ── */
+const PALETTE=['#00d4ff','#00ff88','#ff4d6d','#ffb020','#a78bfa','#f97316','#06b6d4','#84cc16','#ec4899','#8b5cf6','#14b8a6','#f59e0b'];
+let categories=JSON.parse(localStorage.getItem('maptrack_cats')||'[]');
+let newCatColor=PALETTE[0];
+
+function saveCats(){localStorage.setItem('maptrack_cats',JSON.stringify(categories));}
+function getCat(id){return categories.find(c=>c.id===id)||null;}
+function catColor(id){const c=getCat(id);return c?c.color:'#5a6878';}
+function catName(id){const c=getCat(id);return c?c.name:'Uncategorized';}
+
+/* ── Utils ── */
+window.toast=function(msg,type='info'){
+  const c=document.getElementById('toastContainer');
+  const clr={success:'#00ff88',error:'#ff4d6d',info:'#00d4ff'};
+  const brd={success:'border-accent2',error:'border-danger',info:'border-accent'};
+  const ico={success:'✓',error:'✕',info:'ℹ'};
+  const t=document.createElement('div');
+  t.className=`toast bg-[rgba(15,20,28,.97)] backdrop-blur-md border ${brd[type]} rounded-xl py-[9px] px-3.5 text-xs text-ink flex items-center gap-1.5 shadow-xl animate-toast-in`;
+  t.innerHTML=`<span style="color:${clr[type]}">${ico[type]}</span> ${msg}`;
+  c.appendChild(t);
+  setTimeout(()=>{t.style.animation='none';t.style.opacity=0;setTimeout(()=>t.remove(),300);},3200);
+};
+function setLoading(on){document.getElementById('loadingBar').classList.toggle('active',on);}
+function fmtDist(km){
+  if(km<0.001)return'0 m';
+  if(km<1)return(km*1000).toFixed(0)+' m';
+  return km.toFixed(2)+' km';
+}
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371,toR=Math.PI/180;
+  const dLat=(lat2-lat1)*toR,dLng=(lng2-lng1)*toR;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*toR)*Math.cos(lat2*toR)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+/* ── Sidebar toggle (desktop: collapses width; mobile: opens as overlay drawer) ── */
+function isMobileLayout(){ return window.innerWidth<=900; }
+window.toggleSidebar=function(){
+  const sb=document.getElementById('appSidebar');
+  const scrim=document.getElementById('sidebarScrim');
+  if(isMobileLayout()){
+    const open=sb.classList.toggle('mobile-open');
+    scrim.classList.toggle('visible',open);
+  } else {
+    sb.classList.toggle('collapsed');
+  }
+  setTimeout(()=>{ if(window.map) window.map.invalidateSize(); },380);
+};
+/* Keep sidebar state sane when crossing the mobile/desktop breakpoint */
+window.addEventListener('resize',()=>{
+  const sb=document.getElementById('appSidebar');
+  const scrim=document.getElementById('sidebarScrim');
+  if(!isMobileLayout()){
+    sb.classList.remove('mobile-open');
+    scrim.classList.remove('visible');
+  } else {
+    sb.classList.remove('collapsed');
+  }
+});
+
+/* ── Map ── */
+window.map=L.map('map',{zoomControl:false,attributionControl:true}).setView([20,0],2);
+L.control.zoom({position:'bottomright'}).addTo(map);
+
+const layers={
+  street:     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}),
+  satellite:  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri — Source: Esri, USGS, NOAA'}),
+  hybrid:     L.layerGroup([
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}),
+                L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/toner-hybrid/{z}/{x}/{y}.png',{maxZoom:19,opacity:.6})
+              ]),
+  topo:       L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenTopoMap'}),
+  dark:       L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',{maxZoom:20,attribution:'© Stadia Maps'})
+};
+let currentLayer=layers.street;
+currentLayer.addTo(map);
+
+window.setLayer=function(name,el){
+  map.removeLayer(currentLayer);
+  currentLayer=layers[name];
+  currentLayer.addTo(map);
+  document.querySelectorAll('.ltab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+};
+
+/* ── Marker cluster group ── */
+const clusterGroup=L.markerClusterGroup({maxClusterRadius:60,spiderfyOnMaxZoom:true,showCoverageOnHover:false,zoomToBoundsOnClick:true});
+map.addLayer(clusterGroup);
+
+const geocodeIcon=L.icon({iconUrl:'https://cdn-icons-png.flaticon.com/128/9131/9131546.png',iconSize:[26,26],iconAnchor:[13,26],popupAnchor:[0,-26]});
+
+function makePinIcon(color){
+  return L.divIcon({
+    html:`<div style="position:relative;width:28px;height:36px;">
+      <svg viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg" style="width:28px;height:36px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">
+        <path d="M14 0C6.27 0 0 6.27 0 14c0 9.33 14 22 14 22S28 23.33 28 14C28 6.27 21.73 0 14 0z" fill="${color}"/>
+        <circle cx="14" cy="14" r="6" fill="white" opacity="0.9"/>
+      </svg>
+    </div>`,
+    className:'',iconSize:[28,36],iconAnchor:[14,36],popupAnchor:[0,-36]
+  });
+}
+
+function addMarker(name,lat,lng,key,catId){
+  const color=catColor(catId);
+  const cat=getCat(catId);
+  const catLabel=cat?`<span style="background:${color}22;color:${color};border:1px solid ${color}44;border-radius:8px;font-size:10px;padding:1px 6px;font-weight:700">${cat.name}</span>`:'';
+  const m=L.marker([lat,lng],{icon:makePinIcon('#ff2222')})
+    .bindPopup(`<div style="font-family:'DM Sans',sans-serif;font-size:13px;padding:2px;min-width:130px">
+      <b style="color:${color}">${name}</b><br>
+      ${catLabel}
+      <br><span style="color:#5a6878;font-size:11px">${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+    </div>`)
+    .on('click',()=>showInfoPanel(name,lat,lng,catId));
+  if(key)mapMarkers[key]=m;
+  clusterGroup.addLayer(m);
+}
+
+/* ── Geolocation ── */
+if(navigator.geolocation){
+  navigator.geolocation.watchPosition(pos=>{
+    userLat=pos.coords.latitude; userLng=pos.coords.longitude;
+    const userIcon=L.divIcon({
+      html:`<div style="width:14px;height:14px;border-radius:50%;background:#00d4ff;border:3px solid #fff;box-shadow:0 0 0 6px rgba(0,212,255,.25)"></div>`,
+      className:'',iconSize:[14,14],iconAnchor:[7,7]
+    });
+    if(!userMarker){
+      userMarker=L.marker([userLat,userLng],{icon:userIcon,zIndexOffset:1000}).addTo(map).bindPopup("📍 You are here");
+      accuracyCircle=L.circle([userLat,userLng],{radius:pos.coords.accuracy,color:'#00d4ff',fillOpacity:.06,weight:1}).addTo(map);
+      map.setView([userLat,userLng],15);
+    } else {
+      userMarker.setLatLng([userLat,userLng]);
+      accuracyCircle.setLatLng([userLat,userLng]);
+      accuracyCircle.setRadius(pos.coords.accuracy);
+    }
+    const gd=document.getElementById('gpsDot'),gt=document.getElementById('gpsText');
+    if(gd){gd.classList.add('live');}
+    if(gt){gt.textContent='Location active';}
+    if(allNodes.length) applyFilter();
+  },err=>{
+    console.warn(err);
+    const gt=document.getElementById('gpsText');
+    if(gt) gt.textContent='Location unavailable';
+  },{enableHighAccuracy:true,maximumAge:0,timeout:10000});
+}
+
+window.flyToUser=function(){
+  if(userLat&&userLng){map.flyTo([userLat,userLng],17,{animate:true,duration:1.2});toast("Flying to your location","info");}
+  else toast("Location not available yet","error");
+};
+
+/* ── Fullscreen ── */
+window.toggleFullscreen=function(){
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen();
+    document.getElementById('fsIcon').innerHTML='<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>';
+  } else {
+    document.exitFullscreen();
+    document.getElementById('fsIcon').innerHTML='<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
+  }
+};
+
+/* ── Geocoding (Nominatim) ── */
+let geocodeMarker=null;
+window.debounceGeocode=function(){
+  clearTimeout(geocodeTimer);
+  const q=document.getElementById('geocodeInput').value.trim();
+  if(q.length<3){document.getElementById('geocodeResults').innerHTML='';return;}
+  geocodeTimer=setTimeout(()=>fetchGeocodeResults(q),500);
+};
+
+async function fetchGeocodeResults(q){
+  try{
+    const res=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5`);
+    const data=await res.json();
+    const box=document.getElementById('geocodeResults');
+    box.innerHTML='';
+    data.forEach(item=>{
+      const d=document.createElement('div');
+      d.className='geocode-item px-3.5 py-2.5 text-[13px] cursor-pointer border-b border-white/[0.07] flex items-center gap-2 transition last:border-b-0 hover:bg-surface2 hover:text-accent';
+      d.innerHTML=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="flex-shrink-0 text-muted"><path d="M12 2a8 8 0 0 1 8 8c0 5-8 12-8 12S4 15 4 10a8 8 0 0 1 8-8z"/><circle cx="12" cy="10" r="3"/></svg>${item.display_name.substring(0,60)}…`;
+      d.onclick=()=>flyToResult(item);
+      box.appendChild(d);
+    });
+    if(!data.length) box.innerHTML='<div class="px-3.5 py-2.5 text-[13px] text-muted">No results found</div>';
+  }catch(e){console.error(e);}
+}
+
+function flyToResult(item){
+  const lat=parseFloat(item.lat),lng=parseFloat(item.lon);
+  document.getElementById('geocodeResults').innerHTML='';
+  document.getElementById('geocodeInput').value=item.display_name.substring(0,50);
+  if(geocodeMarker) map.removeLayer(geocodeMarker);
+  geocodeMarker=L.marker([lat,lng],{icon:geocodeIcon}).addTo(map)
+    .bindPopup(`<div style="font-family:'DM Sans',sans-serif;font-size:12px"><b>${item.display_name.substring(0,80)}</b></div>`)
+    .openPopup();
+  map.flyTo([lat,lng],15,{animate:true,duration:1.5});
+  toast("Flew to location","info");
+}
+
+window.doGeocode=function(){
+  const q=document.getElementById('geocodeInput').value.trim();
+  if(q) fetchGeocodeResults(q);
+};
+
+/* ── Click-on-map Add Mode ── */
+window.toggleAddMode=function(btn){
+  addMode=!addMode;
+  btn.classList.toggle('active',addMode);
+  document.getElementById('clickAddBanner').classList.toggle('visible',addMode);
+  if(addMode){
+    map.getContainer().classList.add('map-adding');
+    map.on('click',onMapAddClick);
+    toast("Click the map to drop a delivery point","info");
+  } else {
+    map.getContainer().classList.remove('map-adding');
+    map.off('click',onMapAddClick);
+  }
+};
+
+function onMapAddClick(e){
+  if(measureActive) return;
+  pendingLatLng={lat:e.latlng.lat,lng:e.latlng.lng};
+  document.getElementById('addPointCoords').textContent=`${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+  document.getElementById('addPointName').value='';
+  document.getElementById('addpoint_msg').textContent='';
+  document.getElementById('addPointModal').classList.add('open');
+}
+
+window.saveClickedPoint=function(){
+  const name=document.getElementById('addPointName').value.trim();
+  const msg=document.getElementById('addpoint_msg');
+  if(!name){msg.textContent='Please enter a name';return;}
+  if(!pendingLatLng){msg.textContent='No location selected';return;}
+  const selCat=document.getElementById('addPointCat').value;
+  const data={a:name,c1:pendingLatLng.lat,c2:pendingLatLng.lng,cat:selCat};
+  set(push(ref(db,'submit')),data).then(()=>{
+    closeModal('addPointModal');
+    pendingLatLng=null;
+    loadData();
+    toast("Point added!","success");
+  }).catch(()=>{msg.textContent='Failed to save';});
+};
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(addMode){
+      const btn=document.getElementById('addModeBtn');
+      addMode=false; btn.classList.remove('active');
+      document.getElementById('clickAddBanner').classList.remove('visible');
+      map.getContainer().classList.remove('map-adding');
+      map.off('click',onMapAddClick);
+    }
+  }
+});
+
+/* ── Info Panel ── */
+function showInfoPanel(name,lat,lng,catId){
+  currentInfoLat=lat; currentInfoLng=lng; currentInfoName=name;
+  const cat=getCat(catId);
+  const catBadge=cat?`<span style="margin-left:6px;background:${cat.color}22;color:${cat.color};border:1px solid ${cat.color}55;border-radius:8px;font-size:10px;padding:1px 8px;font-weight:700">${cat.name}</span>`:'';
+  document.getElementById('infoPinName').innerHTML=name+catBadge;
+  document.getElementById('infoPinCoords').textContent=`${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  const dist=(userLat&&userLng)?fmtDist(haversine(userLat,userLng,lat,lng)):'Location unavailable';
+  document.getElementById('infoDistTxt').textContent=`${dist} from your location`;
+  document.getElementById('infoRouteBtn').onclick=()=>window.route(lat,lng);
+  document.getElementById('infoPanel').classList.add('visible');
+}
+window.closeInfoPanel=function(){document.getElementById('infoPanel').classList.remove('visible');};
+window.infoCopyCoords=function(){
+  if(currentInfoLat!==null){
+    navigator.clipboard.writeText(`${currentInfoLat.toFixed(6)}, ${currentInfoLng.toFixed(6)}`).then(()=>toast("Coordinates copied!","success")).catch(()=>toast("Copy failed","error"));
+  }
+};
+
+/* ── Category Management ── */
+function buildColorPicker(){
+  const pop=document.getElementById('colorPickerPopup'); pop.innerHTML='';
+  PALETTE.forEach(col=>{
+    const s=document.createElement('div');
+    s.className='w-5 h-5 rounded-full cursor-pointer border-2 transition hover:scale-110 '+(col===newCatColor?'border-white scale-110':'border-transparent');
+    s.style.background=col;
+    s.onclick=()=>{
+      newCatColor=col;
+      document.getElementById('newCatColorThumb').style.background=col;
+      pop.querySelectorAll('div').forEach(x=>{x.classList.remove('border-white','scale-110');x.classList.add('border-transparent');});
+      s.classList.remove('border-transparent');s.classList.add('border-white','scale-110');
+      pop.classList.remove('open');
+    };
+    pop.appendChild(s);
+  });
+}
+window.toggleColorPicker=function(){
+  buildColorPicker();
+  document.getElementById('colorPickerPopup').classList.toggle('open');
+};
+document.addEventListener('click',e=>{
+  const pop=document.getElementById('colorPickerPopup');
+  if(pop&&!pop.closest('.relative').contains(e.target)) pop.classList.remove('open');
+});
+
+function buildCatList(){
+  const el=document.getElementById('catList'); el.innerHTML='';
+  if(!categories.length){el.innerHTML='<div class="text-xs text-muted p-2">No groups yet. Create one below.</div>';return;}
+  categories.forEach(cat=>{
+    const count=allNodes.filter(n=>n.catId===cat.id).length;
+    const row=document.createElement('div');
+    row.className='flex items-center gap-2 bg-surface2 border border-white/[0.07] rounded-lg py-2 px-2.5 transition hover:border-white/[0.12]';
+    row.innerHTML=`
+      <div class="w-[18px] h-[18px] rounded-full border-2 border-white/20 flex-shrink-0" style="background:${cat.color}"></div>
+      <span class="flex-1 text-[13px] font-medium text-ink">${cat.name}</span>
+      <span class="font-mono text-[10px] text-muted bg-surface3 rounded-lg px-1.5 py-0.5">${count} pts</span>
+      <button class="w-6 h-6 rounded-md border border-transparent bg-transparent text-muted cursor-pointer flex items-center justify-center transition flex-shrink-0 hover:border-danger hover:text-danger" onclick="window.deleteCategory('${cat.id}')" title="Delete group">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>`;
+    el.appendChild(row);
+  });
+}
+
+/* ── Group filter bar: "All Groups" removed — clicking the active group tab again clears the filter ── */
+function buildGroupFilterBar(){
+  const bar=document.getElementById('groupFilterBar'); bar.innerHTML='';
+  if(!categories.length) return;
+  categories.forEach(cat=>{
+    const btn=document.createElement('button');
+    btn.className='gftab text-[11px] font-semibold py-[3px] px-2.5 rounded-full border border-white/[0.07] bg-transparent cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 flex-shrink-0 hover:not-[.active]:border-white/[0.12] hover:not-[.active]:text-ink'+(currentGroupFilter===cat.id?' active':'');
+    btn.style.color=cat.color; if(currentGroupFilter===cat.id) btn.style.borderColor=cat.color;
+    btn.innerHTML=`<span class="inline-block w-2 h-2 rounded-full flex-shrink-0" style="background:${cat.color}"></span>${cat.name}`;
+    btn.onclick=()=>setGroupFilter(cat.id,btn);
+    bar.appendChild(btn);
+  });
+}
+
+window.setGroupFilter=function(id,el){
+  /* toggle: clicking the already-active group clears the filter back to showing all */
+  currentGroupFilter=(currentGroupFilter===id)?'__all__':id;
+  document.querySelectorAll('.gftab').forEach(b=>{b.classList.remove('active');b.style.borderColor='rgba(255,255,255,.07)';});
+  if(currentGroupFilter!=='__all__'){
+    el.classList.add('active');
+    el.style.borderColor=el.style.color||'#8899aa';
+  }
+  applyFilter();
+};
+
+function populateCatSelect(){
+  const sel=document.getElementById('addPointCat'); if(!sel) return;
+  sel.innerHTML='<option value="">— No category —</option>';
+  categories.forEach(cat=>{
+    const o=document.createElement('option'); o.value=cat.id; o.textContent=cat.name;
+    sel.appendChild(o);
+  });
+}
+
+window.openCatModal=function(){
+  buildCatList(); buildColorPicker();
+  document.getElementById('cat_msg').textContent='';
+  document.getElementById('newCatName').value='';
+  document.getElementById('colorPickerPopup').classList.remove('open');
+  document.getElementById('catModal').classList.add('open');
+};
+
+window.addCategory=function(){
+  const name=document.getElementById('newCatName').value.trim();
+  const msg=document.getElementById('cat_msg');
+  if(!name){msg.textContent='Please enter a group name';return;}
+  if(categories.find(c=>c.name.toLowerCase()===name.toLowerCase())){msg.textContent='Group already exists';return;}
+  const id='cat_'+Date.now();
+  categories.push({id,name,color:newCatColor});
+  saveCats(); buildCatList(); buildGroupFilterBar(); populateCatSelect();
+  document.getElementById('newCatName').value='';
+  msg.style.color='#00ff88'; msg.textContent='Group "'+name+'" added!';
+  setTimeout(()=>msg.textContent='',2000);
+  toast('Group "'+name+'" created','success');
+};
+
+window.deleteCategory=function(id){
+  categories=categories.filter(c=>c.id!==id);
+  saveCats(); buildCatList(); buildGroupFilterBar(); populateCatSelect();
+  if(currentGroupFilter===id){currentGroupFilter='__all__';applyFilter();}
+  toast('Group deleted','info');
+};
+
+buildGroupFilterBar();
+populateCatSelect();
+
+/* ── Export CSV ── */
+window.exportCSV=function(){
+  if(!allNodes.length){toast("No data to export","error");return;}
+  const rows=['Name,Latitude,Longitude,Category',...allNodes.map(n=>`${n.data},${n.lat},${n.lng},${catName(n.catId)}`)];
+  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='delivery_points.csv'; a.click();
+  toast("CSV exported!","success");
+};
+
+/* ── Heatmap ── */
+window.toggleHeatmap=function(btn){
+  heatVisible=!heatVisible;
+  btn.classList.toggle('active',heatVisible);
+  document.getElementById('heatLegend').classList.toggle('visible',heatVisible);
+  if(heatVisible){
+    const pts=allNodes.filter(n=>n.lat&&n.lng).map(n=>[n.lat,n.lng,0.8]);
+    if(heatLayer) map.removeLayer(heatLayer);
+    heatLayer=L.heatLayer(pts,{radius:35,blur:20,maxZoom:17,gradient:{0.2:'blue',0.4:'cyan',0.6:'lime',0.8:'yellow',1.0:'red'}}).addTo(map);
+    toast("Heatmap enabled","info");
+  } else {
+    if(heatLayer){map.removeLayer(heatLayer);heatLayer=null;}
+  }
+};
+
+/* ── Linked List ── */
+class Node{
+  constructor(d,id,lat,lng,catId,b){
+    this.data=d;
+    this.id=id;
+    this.lat=lat;
+    this.lng=lng;
+    this.catId=catId||'';
+    this.link=null;
+    this.b=b;
+  }
+  }
+class LinkedList{
+  constructor(){this.head=null;}
+  add(v,id,lat,lng,catId,b){const n=new Node(v,id,lat,lng,catId,b);n.link=this.head;this.head=n;}
+  del(id){
+    if(!this.head)return;
+    if(this.head.id===id){this.head=this.head.link;return;}
+    let c=this.head;
+    while(c.link&&c.link.id!==id)c=c.link;
+    if(c.link)c.link=c.link.link;
+  }
+  toArray(){const a=[];let c=this.head;while(c){a.push(c);c=c.link;}return a;}
+  render(nodes){
+    const el=document.getElementById("display_items");
+    el.innerHTML="";
+    document.getElementById("listCount").textContent=nodes.length;
+    if(currentFilter==="nearby") document.getElementById("nearbyCount").textContent=nodes.length;
+    if(!nodes.length){
+      el.innerHTML=`<div class="flex flex-col items-center gap-2.5 py-8 px-4 text-center">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#5a6878" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <p class="text-xs text-muted leading-relaxed">No points found.<br>${currentFilter==='nearby'?'Try increasing the distance.':'Add one or refresh.'}</p>
+      </div>`; return;
+    }
+    nodes.forEach(c=>{
+      const hasLoc=userLat&&userLng&&c.lat&&c.lng;
+      const dist=hasLoc?haversine(userLat,userLng,c.lat,c.lng):null;
+      let distHtml='';
+      if(dist!==null){
+        const pillCls=dist<=2?'bg-accent2':'bg-warn';
+        distHtml=`<div class="flex items-center gap-1.5 text-[11px] text-muted mt-0.5"><span class="font-mono text-[10px] font-bold text-white ${pillCls} rounded px-1.5 py-px">${fmtDist(dist)}</span></div>`;
+      }
+      const cat=getCat(c.catId);
+      const color=cat?cat.color:'#5a6878';
+      const catBadge=cat?`<span class="text-[10px] font-bold py-px px-1.5 rounded-full tracking-wide whitespace-nowrap" style="background:${color}20;color:${color};border:1px solid ${color}40">${cat.name}</span>`:'';
+      const card=document.createElement("div");
+      card.className="delivery-card bg-surface2 border border-white/[0.07] rounded-xl py-2.5 px-3 flex items-center gap-2.5 transition cursor-pointer hover:border-accent/[0.35] hover:translate-x-0.5 hover:bg-surface3";
+      card.style.borderLeft=`3px solid ${color}`;
+      card.onclick=()=>{map.flyTo([c.lat,c.lng],17,{animate:true,duration:1});showInfoPanel(c.data,c.lat,c.lng,c.catId);};
+      card.innerHTML=`
+        <div class="w-[34px] h-[34px] rounded-lg flex items-center justify-center flex-shrink-0" style="background:${color}15;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div class="text-[13px] font-medium text-ink whitespace-nowrap overflow-hidden text-ellipsis">${c.data}</div>
+          ${c.b?`<div class="text-[11px] text-muted2 whitespace-nowrap overflow-hidden text-ellipsis">${c.b}</div>`:''}
+          <div class="flex items-center gap-1.5 mt-[3px] flex-wrap">
+            ${catBadge}${distHtml}
+          </div>
+        </div>
+        <div class="flex gap-1.5 flex-shrink-0" onclick="event.stopPropagation()">
+          <button class="w-7 h-7 rounded-lg border border-white/[0.07] bg-transparent cursor-pointer flex items-center justify-center transition text-muted hover:border-accent hover:text-accent" onclick="map.flyTo([${c.lat},${c.lng}],17,{animate:true,duration:1})" title="Fly to">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><polygon points="9 15 22 8 15 22 12 17 9 15"/></svg>
+          </button>
+          <button class="w-7 h-7 rounded-lg border border-white/[0.07] bg-transparent cursor-pointer flex items-center justify-center transition text-muted hover:border-accent2 hover:text-accent2" onclick="window.route(${c.lat},${c.lng})" title="Navigate">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 8 14 12"/><path d="M2 12h16"/></svg>
+          </button>
+          <button class="w-7 h-7 rounded-lg border border-white/[0.07] bg-transparent cursor-pointer flex items-center justify-center transition text-muted hover:border-danger hover:text-danger" onclick="window.k('${c.id}')" title="Delete">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>`;
+      el.appendChild(card);
+    });
+  }
+}
+const list=new LinkedList();
+
+/* ── Load ── */
+function loadData(){
+  setLoading(true);
+  clusterGroup.clearLayers(); mapMarkers={}; list.head=null;
+  get(ref(db,"submit")).then(snapshot=>{
+    snapshot.forEach(child=>{
+      const d=child.val();
+      addMarker(d.a,d.c1,d.c2,child.key,d.cat||'');
+      list.add(d.a,child.key,d.c1,d.c2,d.cat||'',d.b||'');
+    });
+    allNodes=list.toArray(); applyFilter();
+    if(heatVisible){
+      const pts=allNodes.filter(n=>n.lat&&n.lng).map(n=>[n.lat,n.lng,0.8]);
+      if(heatLayer) map.removeLayer(heatLayer);
+      heatLayer=L.heatLayer(pts,{radius:35,blur:20,gradient:{0.2:'blue',0.4:'cyan',0.6:'lime',0.8:'yellow',1.0:'red'}}).addTo(map);
+    }
+    setLoading(false);
+  }).catch(err=>{console.error(err);toast("Failed to load data.","error");setLoading(false);});
+}
+loadData();
+
+window.manualRefresh=function(){
+  const btn=document.getElementById("refreshBtn");
+  btn.classList.add("spinning"); btn.style.pointerEvents="none";
+  loadData();
+  setTimeout(()=>{btn.classList.remove("spinning");btn.style.pointerEvents="";},800);
+  toast("Refreshed","info");
+};
+
+/* ── Filter / Search ── */
+window.setFilter=function(f,el){
+  currentFilter=f;
+  document.querySelectorAll(".ftab").forEach(t=>t.classList.remove("active"));
+  el.classList.add("active");
+  document.getElementById("nearbyBar").classList.toggle("visible",f==="nearby");
+  applyFilter();
+};
+
+window.applyFilter=function(){
+  currentSearch=document.getElementById("searchInput").value.trim().toLowerCase();
+  let nodes=allNodes;
+  if(currentSearch) nodes=nodes.filter(n=>n.data.toLowerCase().includes(currentSearch));
+  if(currentGroupFilter!=='__all__') nodes=nodes.filter(n=>n.catId===currentGroupFilter);
+  if(currentFilter==="nearby"){
+    if(!userLat||!userLng){
+      document.getElementById("display_items").innerHTML=`<div class="flex flex-col items-center gap-2.5 py-8 px-4 text-center"><p class="text-xs text-muted leading-relaxed">Waiting for your location…</p></div>`;
+      document.getElementById("listCount").textContent=0; return;
+    }
+    nodes=nodes.map(n=>({...n,_dist:haversine(userLat,userLng,n.lat,n.lng)}))
+      .filter(n=>n._dist<=nearbyMaxKm).sort((a,b)=>a._dist-b._dist);
+    document.getElementById("nearbyCount").textContent=nodes.length;
+  }
+  list.render(nodes);
+};
+
+function syncNearbyUI(km){
+  const label=km<1?(km*1000).toFixed(0)+' m':km+' km';
+  document.getElementById("nearbyDistChip").textContent=label;
+  document.getElementById("nearbyDistInline").textContent=label;
+  const sl=document.getElementById("nearbySlider");
+  sl.style.setProperty('--pct',((km-0.5)/(50-0.5)*100).toFixed(1)+'%');
+  document.querySelectorAll(".npreset").forEach(b=>b.classList.toggle("active",parseFloat(b.textContent)===km));
+}
+window.onNearbySlider=function(el){nearbyMaxKm=parseFloat(el.value);syncNearbyUI(nearbyMaxKm);applyFilter();};
+window.setNearbyPreset=function(km){nearbyMaxKm=km;document.getElementById("nearbySlider").value=km;syncNearbyUI(km);applyFilter();};
+
+/* ── Route All (nearest-neighbor) ── */
+window.routeAll=function(){
+  if(!userLat||!userLng){toast("Location not ready","error");return;}
+  const pts=allNodes.filter(n=>n.lat&&n.lng);
+  if(!pts.length){toast("No delivery points","error");return;}
+  let remaining=[...pts],ordered=[],cur=[userLat,userLng];
+  while(remaining.length){
+    remaining.sort((a,b)=>haversine(cur[0],cur[1],a.lat,a.lng)-haversine(cur[0],cur[1],b.lat,b.lng));
+    const next=remaining.shift(); ordered.push(next); cur=[next.lat,next.lng];
+  }
+  if(routeAllControl){map.removeControl(routeAllControl);routeAllControl=null;}
+  if(routingControl){map.removeControl(routingControl);routingControl=null;}
+  const waypoints=[L.latLng(userLat,userLng),...ordered.map(p=>L.latLng(p.lat,p.lng))];
+  routeAllControl=L.Routing.control({
+    waypoints,
+    router:L.Routing.osrmv1({serviceUrl:'https://router.project-osrm.org/route/v1',profile:'driving'}),
+    routeWhileDragging:false,addWaypoints:false,draggableWaypoints:false,
+    createMarker:()=>null,show:false,
+    lineOptions:{styles:[{color:'#00ff88',opacity:.85,weight:4,dashArray:'8 4'}]}
+  }).addTo(map);
+  routeAllControl.on("routesfound",e=>{
+    const r=e.routes[0];
+    const km=(r.summary.totalDistance/1000).toFixed(1);
+    const mins=Math.round(r.summary.totalTime/60);
+    document.getElementById("rb-dist").textContent=km+" km";
+    document.getElementById("rb-time").textContent=mins>=60?`${Math.floor(mins/60)}h ${mins%60}m`:mins+"m";
+    document.getElementById("rb-stops").textContent=ordered.length;
+    document.getElementById("routeBar").classList.add("visible");
+    document.getElementById("infoPanel").classList.remove("visible");
+  });
+  map.fitBounds(L.latLngBounds([[userLat,userLng],...ordered.map(p=>[p.lat,p.lng])]),{padding:[60,60]});
+};
+window.clearRouteAll=function(){
+  if(routeAllControl){map.removeControl(routeAllControl);routeAllControl=null;}
+  document.getElementById("routeBar").classList.remove("visible");
+};
+
+/* ── Single Route with Turn-by-Turn ── */
+window.route=function(tLat,tLng){
+  if(!userLat||!userLng){toast("Location not ready","error");return;}
+  if(routeAllControl){map.removeControl(routeAllControl);routeAllControl=null;document.getElementById("routeBar").classList.remove("visible");}
+  if(routingControl) map.removeControl(routingControl);
+  routingControl=L.Routing.control({
+    waypoints:[L.latLng(userLat,userLng),L.latLng(tLat,tLng)],
+    router:L.Routing.osrmv1({serviceUrl:'https://router.project-osrm.org/route/v1',profile:'driving'}),
+    routeWhileDragging:false,addWaypoints:false,draggableWaypoints:false,
+    createMarker:()=>null,show:false,
+    lineOptions:{styles:[{color:'#00d4ff',opacity:.9,weight:4}]}
+  }).addTo(map);
+  routingControl.on("routesfound",e=>{
+    const r=e.routes[0];
+    const km=(r.summary.totalDistance/1000).toFixed(1);
+    const mins=Math.round(r.summary.totalTime/60);
+    document.getElementById("sp-dist").textContent=km+" km";
+    document.getElementById("sp-time").textContent=mins>=60?`${Math.floor(mins/60)}h ${mins%60}m`:mins+"m";
+    const sl=document.getElementById("stepsList"); sl.innerHTML="";
+    (r.instructions||[]).forEach((step,i)=>{
+      const d=document.createElement("div");
+      d.className="flex items-start gap-2.5 py-2 px-3.5 text-xs text-muted2 border-b border-white/[0.07] transition last:border-b-0 hover:bg-surface2";
+      const segKm=(step.distance/1000).toFixed(2);
+      const txt=step.text||step.type||"Continue";
+      d.innerHTML=`<div class="w-5 h-5 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-[9px] font-bold text-accent flex-shrink-0 mt-px">${i+1}</div><div><div class="leading-tight">${txt}</div><div class="font-mono text-[10px] text-muted mt-0.5">${segKm} km</div></div>`;
+      sl.appendChild(d);
+    });
+    document.getElementById("stepsPanel").classList.add("visible");
+    document.getElementById("infoPanel").classList.remove("visible");
+  });
+  map.fitBounds(L.latLngBounds([[userLat,userLng],[tLat,tLng]]),{padding:[60,60]});
+};
+window.closeSteps=function(){
+  document.getElementById("stepsPanel").classList.remove("visible");
+  if(routingControl){map.removeControl(routingControl);routingControl=null;}
+};
+
+/* ── Confirm Delete ── */
+window.k=function(id){
+  const box=document.getElementById("confirmBox"); box.style.display="flex";
+  document.getElementById("yesBtn").onclick=function(){
+    remove(ref(db,"submit/"+id)).then(()=>{
+      if(mapMarkers[id]){clusterGroup.removeLayer(mapMarkers[id]);delete mapMarkers[id];}
+      list.del(id); allNodes=list.toArray(); applyFilter();
+      box.style.display="none"; toast("Removed","success");
+    }).catch(()=>toast("Delete failed","error"));
+  };
+  document.getElementById("noBtn").onclick=function(){box.style.display="none";};
+};
+
+/* ── Measure ── */
+const measureDotIcon=L.divIcon({
+  html:`<div style="width:11px;height:11px;border-radius:50%;background:#a78bfa;border:2px solid #fff;box-shadow:0 0 6px #a78bfa"></div>`,
+  className:'',iconSize:[11,11],iconAnchor:[5,5]
+});
+window.openMeasureModal=function(){document.getElementById("measureModal").classList.add("open");};
+window.closeMeasureModal=function(){if(measureActive)stopMeasuring();document.getElementById("measureModal").classList.remove("open");};
+document.getElementById("measureModal").addEventListener("click",e=>{if(e.target===document.getElementById("measureModal"))window.closeMeasureModal();});
+window.toggleMeasureActive=function(){measureActive?stopMeasuring():startMeasuring();};
+function startMeasuring(){
+  measureActive=true;
+  map.getContainer().classList.add("map-measuring");
+  map.on("click",onMeasureClick);
+  const btn=document.getElementById("measureToggleBtn");
+  btn.classList.add("stop"); btn.textContent="■ Stop";
+  document.getElementById("measureHintTxt").innerHTML="<b>Active!</b> Click the map to place points.";
+  document.getElementById("measureModal").classList.remove("open");
+  document.getElementById("measureFloatBar").style.display="flex";
+}
+function stopMeasuring(){
+  measureActive=false;
+  map.getContainer().classList.remove("map-measuring");
+  map.off("click",onMeasureClick);
+  const btn=document.getElementById("measureToggleBtn");
+  btn.classList.remove("stop"); btn.textContent="▶ Start";
+  document.getElementById("measureHintTxt").innerHTML="Press <b>Start</b> then click points on the map.";
+  document.getElementById("measureFloatBar").style.display="none";
+  document.getElementById("measureModal").classList.add("open");
+}
+function onMeasureClick(e){
+  const pt=[e.latlng.lat,e.latlng.lng];
+  measurePoints.push(pt);
+  measureMarkers.push(L.marker(pt,{icon:measureDotIcon}).addTo(map));
+  if(measurePolyline) map.removeLayer(measurePolyline);
+  let total=0,lastSeg=null;
+  if(measurePoints.length>1){
+    measurePolyline=L.polyline(measurePoints,{color:'#a78bfa',weight:2,dashArray:'5 5',opacity:.9}).addTo(map);
+    for(let i=1;i<measurePoints.length;i++){
+      const seg=haversine(measurePoints[i-1][0],measurePoints[i-1][1],measurePoints[i][0],measurePoints[i][1]);
+      total+=seg; if(i===measurePoints.length-1) lastSeg=seg;
+    }
+  }
+  const n=measurePoints.length;
+  document.getElementById("mTotalDist").textContent=n>1?fmtDist(total):'—';
+  document.getElementById("mLastSeg").textContent=lastSeg!==null?fmtDist(lastSeg):'—';
+  document.getElementById("mPtCount").textContent=n;
+  document.getElementById("mAvgSeg").textContent=n>1?fmtDist(total/(n-1)):'—';
+  document.getElementById("mfDist").textContent=n>1?fmtDist(total):'—';
+  document.getElementById("mfPts").textContent=n;
+  const pl=document.getElementById("measurePtsList"); pl.innerHTML="";
+  measurePoints.forEach((p,i)=>{
+    const segDist=i>0?haversine(measurePoints[i-1][0],measurePoints[i-1][1],p[0],p[1]):null;
+    const d=document.createElement("div");
+    d.className="text-[10px] font-mono rounded py-0.5 px-2 flex justify-between "+(i===n-1?"text-accent2 bg-surface2 border border-accent2/25":"text-muted bg-surface2 border border-white/[0.07]");
+    d.innerHTML=`<span>P${i+1} ${p[0].toFixed(5)}, ${p[1].toFixed(5)}</span>${segDist!==null?`<span class="text-accent ml-2">+${fmtDist(segDist)}</span>`:''}`;
+    pl.appendChild(d);
+  });
+  pl.scrollTop=pl.scrollHeight;
+}
+window.clearMeasure=function(){
+  measurePoints=[];
+  measureMarkers.forEach(m=>map.removeLayer(m)); measureMarkers=[];
+  if(measurePolyline){map.removeLayer(measurePolyline);measurePolyline=null;}
+  ['mTotalDist','mLastSeg','mAvgSeg'].forEach(id=>document.getElementById(id).textContent='—');
+  document.getElementById("mPtCount").textContent='0';
+  document.getElementById("measurePtsList").innerHTML='';
+};
+
+/* ── Upload ── */
+class ItemNode{constructor(d){this.data=d;this.link=null;}}
+class ItemList{constructor(){this.head=null;}add(v){const n=new ItemNode(v);n.link=this.head;this.head=n;}}
+const items=new ItemList();
+window.chintu=function(){
+  const file=document.getElementById("images").files[0];
+  const name=document.getElementById("names").value.trim();
+  const amt=document.getElementById("numbers").value.trim();
+  const msg=document.getElementById("upload_msg");
+  if(!file){msg.textContent="Please upload an image";return;}
+  if(!name){msg.textContent="Please enter a name";return;}
+  if(!amt){msg.textContent="Please enter an amount";return;}
+  const reader=new FileReader();
+  reader.onload=function(){
+    const data={a:reader.result,b:name,c:amt};
+    set(push(ref(db,'user')),data).then(()=>{
+      document.getElementById("images").value=""; document.getElementById("names").value=""; document.getElementById("numbers").value="";
+      msg.style.color="#00ff88"; msg.textContent="Item uploaded!";
+      items.add(data);
+      setTimeout(()=>{msg.textContent="";closeModal('uploadModal');toast("Item added","success");},1200);
+    }).catch(()=>msg.textContent="Upload failed.");
+  };
+  reader.readAsDataURL(file);
+};
+
+window.delete_btn=function(){
+  const nam=document.getElementById("nam").value.trim();
+  const amu=document.getElementById("amu").value.trim();
+  const msg=document.getElementById("delete_msg");
+  if(!nam){msg.textContent="Please enter a name";return;}
+  if(!amu){msg.textContent="Please enter an amount";return;}
+  onValue(ref(db,"user"),snapshot=>{
+    let found=false;
+    snapshot.forEach(child=>{
+      const d=child.val();
+      if(d.b===nam&&d.c===amu){
+        found=true;
+        remove(ref(db,"user/"+child.key)).then(()=>{
+          document.getElementById("nam").value=""; document.getElementById("amu").value="";
+          msg.style.color="#00ff88"; msg.textContent="Deleted!";
+          setTimeout(()=>{msg.textContent="";closeModal('deleteModal');toast("Deleted","success");},1200);
+        });
+      }
+    });
+    if(!found) msg.textContent="Item not found";
+  },{onlyOnce:true});
+};
+
+/* ── modals ── */
+window.showUpload=function(){document.getElementById("uploadModal").classList.add("open");};
+window.showDelete=function(){document.getElementById("deleteModal").classList.add("open");};
+window.closeModal=function(id){document.getElementById(id).classList.remove("open");};
+document.querySelectorAll(".modal-overlay").forEach(el=>{
+  el.addEventListener("click",e=>{if(e.target===el&&el.id!=="measureModal")el.classList.remove("open");});
+});
+
+/* ── Payment ── */
+window.g=function(){
+  qrGenerated=false; qrVisible=false;
+  document.getElementById("payQrCanvas").innerHTML="";
+  document.getElementById("qrWrapper").classList.remove("visible");
+  document.getElementById("qrToggleBtn").textContent="Show QR Code";
+  document.getElementById("paymentModal").classList.add("open");
+};
+window.closePayment=function(){document.getElementById("paymentModal").classList.remove("open");};
+window.toggleQR=function(){
+  const wrapper=document.getElementById("qrWrapper"),btn=document.getElementById("qrToggleBtn");
+  if(!qrGenerated){
+    new QRCode(document.getElementById("payQrCanvas"),{text:"upi://pay?pa=chintukr32101-1@okhdfcbank&pn=Chintu&cu=INR",width:200,height:200,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.H});
+    qrGenerated=true;
+  }
+  qrVisible=!qrVisible;
+  wrapper.classList.toggle("visible",qrVisible);
+  btn.textContent=qrVisible?"Hide QR Code":"Show QR Code";
+};
+
+/* initial resize so map fills the flex layout correctly */
+window.addEventListener('load',()=>{ setTimeout(()=>{ if(window.map) window.map.invalidateSize(); },200); });
+window.addEventListener('resize',()=>{ if(window.map) window.map.invalidateSize(); });
+</script>
+</body>
+</html>

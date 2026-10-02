@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus — Binary Referral Network</title>
+<link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+:root {
+  --void: #050508;
+  --surface: #0c0d14;
+  --panel: #11121c;
+  --card: #161824;
+  --card-hover: #1c1f30;
+  --border: rgba(255,255,255,0.06);
+  --border-bright: rgba(255,255,255,0.12);
+  --lime: #c8ff57;
+  --lime-dim: rgba(200,255,87,0.15);
+  --lime-glow: rgba(200,255,87,0.35);
+  --amber: #ffb547;
+  --amber-dim: rgba(255,181,71,0.15);
+  --sky: #5db8ff;
+  --sky-dim: rgba(93,184,255,0.12);
+  --rose: #ff6b8a;
+  --rose-dim: rgba(255,107,138,0.12);
+  --violet: #b06cff;
+  --violet-dim: rgba(176,108,255,0.12);
+  --text-0: #f0f0f8;
+  --text-1: #9596ac;
+  --text-2: #5a5b70;
+  --shadow-deep: 0 20px 60px rgba(0,0,0,0.7), 0 4px 16px rgba(0,0,0,0.5);
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.4);
+  --font-head: 'Clash Display', sans-serif;
+  --font-body: 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-body);
+  background:var(--void);
+  color:var(--text-0);
+  min-height:100vh;
+  overflow-x:hidden;
+  cursor:none;
+}
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  opacity:0.025;pointer-events:none;z-index:9999;
+}
+.grid-bg{
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(200,255,87,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(200,255,87,0.03) 1px,transparent 1px);
+  background-size:48px 48px;
+  animation:gridDrift 40s linear infinite;
+  pointer-events:none;z-index:0;
+}
+@keyframes gridDrift{from{background-position:0 0}to{background-position:48px 48px}}
+.ambient{position:fixed;pointer-events:none;z-index:0;border-radius:50%;filter:blur(120px);opacity:0.25}
+.ambient-1{width:600px;height:600px;top:-200px;right:-100px;background:radial-gradient(circle,var(--lime) 0%,transparent 70%);animation:ambientFloat 12s ease-in-out infinite alternate}
+.ambient-2{width:500px;height:500px;bottom:-150px;left:-100px;background:radial-gradient(circle,var(--violet) 0%,transparent 70%);animation:ambientFloat 15s ease-in-out infinite alternate-reverse}
+@keyframes ambientFloat{from{transform:translate(0,0) scale(1)}to{transform:translate(30px,40px) scale(1.1)}}
+
+/* HEADER */
+header{
+  position:sticky;top:0;z-index:200;
+  background:rgba(5,5,8,0.85);
+  backdrop-filter:blur(24px) saturate(1.8);
+  -webkit-backdrop-filter:blur(24px) saturate(1.8);
+  border-bottom:1px solid var(--border);
+  height:68px;display:flex;align-items:center;
+  padding:0 1.5rem;gap:1rem;
+}
+.logo{display:flex;align-items:center;gap:0.65rem;text-decoration:none}
+.logo-mark{
+  width:36px;height:36px;background:var(--lime);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;
+}
+.logo-mark::after{
+  content:'';position:absolute;inset:0;
+  background:conic-gradient(transparent 0deg,rgba(255,255,255,0.3) 90deg,transparent 180deg);
+  animation:spin 3s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.logo-mark svg{position:relative;z-index:1;width:18px;height:18px;color:#000}
+.logo-text{font-family:var(--font-head);font-weight:700;font-size:1.2rem;letter-spacing:-0.5px;color:var(--text-0)}
+.logo-text span{color:var(--lime)}
+.header-nav{display:flex;gap:0.3rem;margin:0 auto}
+.nav-btn{
+  padding:0.4rem 0.85rem;border-radius:8px;border:1px solid transparent;
+  background:transparent;color:var(--text-1);font-family:var(--font-body);
+  font-size:0.82rem;font-weight:500;cursor:pointer;transition:all 0.2s;
+}
+.nav-btn:hover{background:var(--border);color:var(--text-0)}
+.nav-btn.active{background:var(--lime-dim);border-color:rgba(200,255,87,0.3);color:var(--lime)}
+.nav-btn.danger{color:var(--rose)}
+.nav-btn.danger:hover{background:var(--rose-dim);border-color:rgba(255,107,138,0.3);color:var(--rose)}
+.header-right{display:flex;align-items:center;gap:0.75rem;margin-left:auto}
+.live-pulse{
+  display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;
+  border-radius:8px;background:rgba(200,255,87,0.06);
+  border:1px solid rgba(200,255,87,0.15);font-size:0.75rem;
+  font-weight:600;color:var(--lime);letter-spacing:0.3px;
+}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--lime);animation:pulsate 1.5s ease-out infinite;flex-shrink:0}
+@keyframes pulsate{0%{box-shadow:0 0 0 0 var(--lime-glow);opacity:1}70%{box-shadow:0 0 0 8px transparent;opacity:0.7}100%{box-shadow:0 0 0 0 transparent;opacity:1}}
+.icon-btn{
+  width:38px;height:38px;border-radius:10px;background:var(--panel);
+  border:1px solid var(--border);color:var(--text-1);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;
+}
+.icon-btn:hover{background:var(--card);border-color:var(--border-bright);color:var(--text-0)}
+
+/* SEARCH HERO */
+.search-hero{position:relative;z-index:1;padding:2rem 1.5rem 1rem;max-width:1400px;margin:0 auto}
+.search-label{font-family:var(--font-head);font-size:clamp(1.8rem,4vw,2.8rem);font-weight:700;letter-spacing:-1px;line-height:1.1;margin-bottom:0.4rem}
+.search-label span{color:var(--lime)}
+.search-desc{color:var(--text-1);font-size:0.9rem;margin-bottom:1.5rem;font-weight:400}
+.search-row{display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap}
+.search-field{flex:1;min-width:220px;position:relative;max-width:480px}
+.search-field input{
+  width:100%;padding:0.85rem 1.2rem 0.85rem 2.8rem;border-radius:var(--radius-sm);
+  border:1px solid var(--border-bright);background:var(--card);color:var(--text-0);
+  font-family:var(--font-body);font-size:0.88rem;outline:none;transition:all 0.25s;
+}
+.search-field input:focus{border-color:var(--lime);box-shadow:0 0 0 3px var(--lime-dim),0 4px 20px rgba(0,0,0,0.4)}
+.search-field input::placeholder{color:var(--text-2)}
+.search-icon{position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-2);pointer-events:none;display:flex}
+.filter-chips{display:flex;gap:0.5rem;flex-wrap:wrap}
+.chip{
+  padding:0.45rem 0.9rem;border-radius:20px;border:1px solid var(--border-bright);
+  background:var(--card);color:var(--text-1);font-size:0.78rem;font-weight:500;
+  cursor:pointer;transition:all 0.2s;white-space:nowrap;
+}
+.chip:hover{border-color:rgba(200,255,87,0.3);color:var(--lime);background:var(--lime-dim)}
+.chip.active{border-color:var(--lime);background:var(--lime-dim);color:var(--lime)}
+
+/* STATS */
+.stats-section{
+  position:relative;z-index:1;max-width:1400px;margin:0 auto;
+  padding:0.5rem 1.5rem 1.5rem;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.85rem;
+}
+.stat-card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:1.1rem 1.25rem;position:relative;overflow:hidden;transition:all 0.3s;
+}
+.stat-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity 0.3s;border-radius:var(--radius)}
+.stat-card:hover::before{opacity:1}
+.stat-card:hover{border-color:var(--border-bright);transform:translateY(-2px);box-shadow:var(--shadow-card)}
+.stat-card.lime::before{background:radial-gradient(ellipse at top left,var(--lime-dim),transparent 60%)}
+.stat-card.lime:hover{border-color:rgba(200,255,87,0.2)}
+.stat-card.amber::before{background:radial-gradient(ellipse at top left,var(--amber-dim),transparent 60%)}
+.stat-card.amber:hover{border-color:rgba(255,181,71,0.2)}
+.stat-card.sky::before{background:radial-gradient(ellipse at top left,var(--sky-dim),transparent 60%)}
+.stat-card.sky:hover{border-color:rgba(93,184,255,0.2)}
+.stat-card.rose::before{background:radial-gradient(ellipse at top left,var(--rose-dim),transparent 60%)}
+.stat-card.rose:hover{border-color:rgba(255,107,138,0.2)}
+.stat-card.violet::before{background:radial-gradient(ellipse at top left,var(--violet-dim),transparent 60%)}
+.stat-card.violet:hover{border-color:rgba(176,108,255,0.2)}
+.stat-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:0.7rem}
+.stat-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+.stat-icon.lime{background:var(--lime-dim);color:var(--lime)}
+.stat-icon.amber{background:var(--amber-dim);color:var(--amber)}
+.stat-icon.sky{background:var(--sky-dim);color:var(--sky)}
+.stat-icon.rose{background:var(--rose-dim);color:var(--rose)}
+.stat-icon.violet{background:var(--violet-dim);color:var(--violet)}
+.stat-trend{font-size:0.7rem;font-weight:600;display:flex;align-items:center;gap:0.2rem;padding:0.2rem 0.5rem;border-radius:4px}
+.stat-trend.up{background:rgba(200,255,87,0.1);color:var(--lime)}
+.stat-value{font-family:var(--font-head);font-size:1.8rem;font-weight:700;letter-spacing:-1px;line-height:1;margin-bottom:0.25rem}
+.stat-label{font-size:0.75rem;color:var(--text-1);font-weight:400}
+
+/* MAIN LAYOUT */
+.main-layout{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:0 1.5rem 3rem}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.section-title{font-family:var(--font-head);font-size:1rem;font-weight:600;color:var(--text-0);display:flex;align-items:center;gap:0.6rem}
+.section-title .dot{width:8px;height:8px;border-radius:50%;background:var(--lime);display:inline-block}
+.section-count{font-family:var(--font-mono);font-size:0.72rem;color:var(--text-2);background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:0.15rem 0.5rem;margin-left:0.4rem}
+.view-toggle{display:flex;gap:0.25rem;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:0.2rem}
+.view-toggle button{width:30px;height:30px;border-radius:6px;border:none;background:transparent;color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+.view-toggle button.active{background:var(--card);color:var(--text-0)}
+
+/* CARDS */
+#tree{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1rem}
+#tree.list-view{grid-template-columns:1fr}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:0;position:relative;overflow:hidden;
+  transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  animation:cardReveal 0.5s both;
+}
+@keyframes cardReveal{from{opacity:0;transform:translateY(20px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.card:hover{border-color:var(--border-bright);transform:translateY(-4px) scale(1.01);box-shadow:0 20px 50px rgba(0,0,0,0.5),0 0 0 1px rgba(200,255,87,0.08)}
+.card.gold-card:hover{box-shadow:0 20px 50px rgba(0,0,0,0.5),0 0 0 1px rgba(255,181,71,0.15)}
+.card-glow{position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--lime),transparent);opacity:0;transition:opacity 0.3s}
+.card:hover .card-glow{opacity:1}
+.card.gold-card:hover .card-glow{background:linear-gradient(90deg,transparent,var(--amber),transparent)}
+.card-inner{padding:1.25rem}
+.card-stripe{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--lime),rgba(200,255,87,0.3))}
+.card-stripe.gold{background:linear-gradient(90deg,var(--amber),rgba(255,181,71,0.3))}
+.card-stripe.blue{background:linear-gradient(90deg,var(--sky),rgba(93,184,255,0.3))}
+.card-stripe.violet{background:linear-gradient(90deg,var(--violet),rgba(176,108,255,0.3))}
+.card-top{display:flex;align-items:flex-start;gap:0.85rem;margin-bottom:1rem;padding-top:0.5rem}
+.avatar{
+  width:46px;height:46px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-head);font-weight:700;font-size:1.05rem;
+  flex-shrink:0;position:relative;overflow:hidden;
+}
+.avatar.lime{background:linear-gradient(135deg,#2a4a00,#4a7a10);color:var(--lime)}
+.avatar.gold{background:linear-gradient(135deg,#4a3000,#7a5010);color:var(--amber)}
+.avatar.blue{background:linear-gradient(135deg,#002a4a,#104a7a);color:var(--sky)}
+.avatar.violet{background:linear-gradient(135deg,#2a004a,#4a107a);color:var(--violet)}
+.avatar-shine{position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:conic-gradient(transparent 0deg,rgba(255,255,255,0.1) 90deg,transparent 180deg);animation:spin 4s linear infinite}
+.card-meta{flex:1;min-width:0}
+.card-name{font-family:var(--font-head);font-size:1rem;font-weight:700;letter-spacing:-0.3px;color:var(--text-0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-phone{font-size:0.75rem;color:var(--text-1);margin-top:2px;font-family:var(--font-mono)}
+.card-badge{flex-shrink:0;padding:0.25rem 0.6rem;border-radius:6px;font-size:0.68rem;font-weight:600;letter-spacing:0.3px;text-transform:uppercase}
+.card-badge.top{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(255,181,71,0.2)}
+.card-badge.active{background:var(--lime-dim);color:var(--lime);border:1px solid rgba(200,255,87,0.2)}
+.card-badge.new{background:var(--sky-dim);color:var(--sky);border:1px solid rgba(93,184,255,0.2)}
+.card-badge.pending{background:var(--panel);color:var(--text-2);border:1px solid var(--border)}
+.info-block{display:flex;flex-direction:column;gap:0.45rem;margin-bottom:1rem}
+.info-row{display:flex;align-items:center;gap:0.6rem;font-size:0.78rem;color:var(--text-1)}
+.info-row-label{display:flex;align-items:center;gap:0.4rem;min-width:90px;color:var(--text-2);font-size:0.73rem}
+.ref-code{font-family:var(--font-mono);font-size:0.76rem;font-weight:500;color:var(--lime);background:var(--lime-dim);padding:0.2rem 0.55rem;border-radius:5px;border:1px solid rgba(200,255,87,0.12);letter-spacing:0.5px}
+.ref-code.gold{color:var(--amber);background:var(--amber-dim);border-color:rgba(255,181,71,0.12)}
+.branches{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:1rem}
+.branch{border-radius:10px;padding:0.6rem 0.75rem;border:1px dashed rgba(255,255,255,0.08);background:var(--panel)}
+.branch.filled{border-style:solid;border-color:rgba(200,255,87,0.12);background:rgba(200,255,87,0.04)}
+.branch.filled.gold{border-color:rgba(255,181,71,0.12);background:rgba(255,181,71,0.04)}
+.branch-label{font-size:0.65rem;color:var(--text-2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.3rem;font-weight:500}
+.branch-name{font-size:0.78rem;font-weight:600;color:var(--lime);font-family:var(--font-mono);word-break:break-all}
+.branch-name.empty{color:var(--text-2);font-weight:400;font-style:italic}
+.branch-name.gold{color:var(--amber)}
+.progress-wrap{margin-bottom:0.85rem}
+.progress-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.45rem}
+.progress-label{font-size:0.72rem;color:var(--text-2)}
+.progress-val{font-family:var(--font-mono);font-size:0.72rem;font-weight:600;color:var(--text-0)}
+.progress-track{height:5px;border-radius:10px;background:rgba(255,255,255,0.06);overflow:visible;position:relative}
+.progress-fill{height:100%;border-radius:10px;background:linear-gradient(90deg,rgba(200,255,87,0.6),var(--lime));position:relative;transition:width 1.2s cubic-bezier(0.34,1.56,0.64,1);box-shadow:0 0 10px var(--lime-glow)}
+.progress-fill::after{content:'';position:absolute;right:0;top:50%;transform:translate(50%,-50%);width:10px;height:10px;border-radius:50%;background:var(--lime);border:2px solid var(--void);box-shadow:0 0 8px var(--lime)}
+.progress-fill.gold{background:linear-gradient(90deg,rgba(255,181,71,0.6),var(--amber));box-shadow:0 0 10px rgba(255,181,71,0.4)}
+.progress-fill.gold::after{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.reward-row{display:flex;align-items:center;gap:0.6rem;padding:0.7rem 0.85rem;border-radius:10px;margin-bottom:0.85rem;font-size:0.78rem;font-weight:600}
+.reward-row.unlocked{background:linear-gradient(135deg,rgba(255,181,71,0.08),rgba(255,181,71,0.04));border:1px solid rgba(255,181,71,0.15);color:var(--amber)}
+.reward-row.locked{background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.06);color:var(--text-2)}
+.reward-row svg{flex-shrink:0}
+.reward-amount{margin-left:auto;font-family:var(--font-mono);font-size:0.8rem;font-weight:700}
+.card-actions{display:flex;gap:0.5rem}
+.action-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.6rem 0.85rem;border-radius:10px;border:1px solid transparent;font-family:var(--font-body);font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+.action-btn.primary{background:var(--lime-dim);border-color:rgba(200,255,87,0.2);color:var(--lime)}
+.action-btn.primary:hover{background:rgba(200,255,87,0.2);border-color:var(--lime);box-shadow:0 4px 16px var(--lime-dim)}
+.action-btn.secondary{background:var(--panel);border-color:var(--border);color:var(--text-1)}
+.action-btn.secondary:hover{background:var(--card-hover);border-color:var(--border-bright);color:var(--text-0)}
+.action-btn svg{width:13px;height:13px;flex-shrink:0}
+
+/* DETAIL MODAL */
+#detailModal{display:none;position:fixed;inset:0;z-index:1500;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,0.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#detailModal.open{display:flex}
+.detail-panel{background:var(--card);border:1px solid var(--border-bright);border-radius:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-deep);animation:panelIn 0.35s cubic-bezier(0.34,1.56,0.64,1)}
+@keyframes panelIn{from{opacity:0;transform:scale(0.9) translateY(30px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.detail-header{padding:1.5rem 1.5rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem;position:sticky;top:0;background:var(--card);z-index:1}
+.detail-name{font-family:var(--font-head);font-size:1.2rem;font-weight:700;letter-spacing:-0.3px}
+.detail-sub{font-size:0.78rem;color:var(--text-1);margin-top:3px}
+.detail-close{margin-left:auto;width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--border);color:var(--text-1);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;flex-shrink:0}
+.detail-close:hover{background:var(--card-hover);color:var(--text-0)}
+.detail-body{padding:1.25rem 1.5rem}
+.detail-section{margin-bottom:1.25rem}
+.detail-section-title{font-size:0.7rem;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:1px;margin-bottom:0.65rem}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem}
+.detail-field{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:0.65rem 0.85rem}
+.detail-field.full{grid-column:1/-1}
+.detail-field-label{font-size:0.68rem;color:var(--text-2);margin-bottom:0.25rem;text-transform:uppercase;letter-spacing:0.5px}
+.detail-field-value{font-size:0.85rem;font-weight:600;color:var(--text-0)}
+.detail-field-value.mono{font-family:var(--font-mono);font-size:0.8rem}
+.detail-field-value.lime{color:var(--lime)}
+.detail-field-value.amber{color:var(--amber)}
+.tree-viz{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;flex-direction:column;align-items:center;gap:0.5rem}
+.tree-node-root{background:var(--lime-dim);border:1px solid rgba(200,255,87,0.2);border-radius:8px;padding:0.4rem 0.9rem;font-size:0.78rem;font-weight:600;color:var(--lime);font-family:var(--font-mono)}
+.tree-child{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.4rem 0.75rem;font-size:0.73rem;font-weight:500;color:var(--text-1);font-family:var(--font-mono);text-align:center}
+.tree-child.has-ref{color:var(--sky);border-color:rgba(93,184,255,0.15);background:var(--sky-dim)}
+.tree-child.empty-slot{color:var(--text-2);border-style:dashed}
+
+/* MAP MODAL */
+#mapModal{display:none;position:fixed;inset:0;z-index:2000;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,0.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+#mapModal.open{display:flex}
+.map-shell{background:var(--card);border:1px solid var(--border-bright);border-radius:24px;width:100%;max-width:920px;height:90vh;max-height:700px;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-deep);animation:panelIn 0.35s cubic-bezier(0.34,1.56,0.64,1)}
+.map-head{padding:1.1rem 1.5rem;background:linear-gradient(135deg,#0c0d14,#11121c);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem;flex-shrink:0}
+.map-head-info{flex:1;min-width:0}
+.map-head-title{font-family:var(--font-head);font-size:1rem;font-weight:700;color:var(--text-0);display:flex;align-items:center;gap:0.5rem}
+.map-head-sub{font-size:0.75rem;color:var(--text-2);margin-top:2px;font-family:var(--font-mono)}
+.map-status{display:flex;align-items:center;padding:0.55rem 1.5rem;background:rgba(0,0,0,0.2);border-bottom:1px solid var(--border);font-size:0.78rem;color:var(--text-1);flex-shrink:0;flex-wrap:wrap;gap:0.75rem}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.status-dot.live{background:var(--lime);animation:pulsate 1.5s ease-out infinite}
+.status-dot.searching{background:var(--amber);animation:pulsate 1.5s ease-out infinite}
+.status-dot.error{background:var(--rose)}
+.map-legend{display:flex;gap:1.5rem;align-items:center;margin-left:auto;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:0.45rem;font-size:0.72rem;color:var(--text-2)}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.legend-dot.start{background:#3b82f6;box-shadow:0 0 6px rgba(59,130,246,0.5)}
+.legend-dot.live{background:var(--lime);box-shadow:0 0 6px var(--lime-glow)}
+#leafletMap{flex:1;min-height:0}
+.map-footer{padding:0.75rem 1.5rem;background:rgba(0,0,0,0.2);border-top:1px solid var(--border);display:flex;align-items:center;gap:0.75rem;flex-shrink:0;flex-wrap:wrap}
+.coords-chip{font-family:var(--font-mono);font-size:0.72rem;color:var(--text-2);background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:0.35rem 0.75rem;flex:1;min-width:180px}
+.map-btn{display:flex;align-items:center;gap:0.4rem;padding:0.5rem 0.9rem;border-radius:8px;font-family:var(--font-body);font-size:0.76rem;font-weight:600;cursor:pointer;transition:all 0.2s;border:1px solid transparent;white-space:nowrap}
+.map-btn.primary{background:var(--lime-dim);border-color:rgba(200,255,87,0.2);color:var(--lime)}
+.map-btn.primary:hover{background:rgba(200,255,87,0.2)}
+.map-btn.ghost{background:var(--panel);border-color:var(--border);color:var(--text-1)}
+.map-btn.ghost:hover{background:var(--card-hover);color:var(--text-0)}
+
+/* SIDEBAR */
+.sidebar{position:fixed;top:0;left:0;height:100%;width:0;z-index:500;background:var(--panel);border-right:1px solid var(--border);overflow:hidden;transition:width 0.4s cubic-bezier(0.77,0,0.18,1);box-shadow:var(--shadow-deep)}
+.sidebar-inner{width:300px;height:100%;display:flex;flex-direction:column;overflow:hidden}
+.sidebar-head{padding:1.25rem;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0}
+.sidebar-title{font-family:var(--font-head);font-weight:700;font-size:0.95rem;color:var(--text-0);display:flex;align-items:center;gap:0.5rem}
+.sidebar-sub{font-size:0.72rem;color:var(--text-2);margin-top:3px}
+.sidebar-search{padding:1rem;border-bottom:1px solid var(--border);flex-shrink:0}
+.sidebar-search input{width:100%;padding:0.65rem 0.9rem 0.65rem 2.4rem;border-radius:8px;border:1px solid var(--border-bright);background:var(--card);color:var(--text-0);font-family:var(--font-body);font-size:0.82rem;outline:none}
+.sidebar-search input:focus{border-color:var(--lime)}
+.sidebar-search input::placeholder{color:var(--text-2)}
+.sidebar-search-wrap{position:relative}
+.sidebar-search-wrap svg{position:absolute;left:0.7rem;top:50%;transform:translateY(-50%);color:var(--text-2)}
+.sidebar-list{flex:1;overflow-y:auto;padding:0.75rem}
+.slot-item{display:flex;align-items:center;gap:0.75rem;padding:0.75rem 0.85rem;border-radius:10px;border:1px solid transparent;cursor:pointer;transition:all 0.2s;margin-bottom:0.4rem}
+.slot-item:hover{background:var(--card);border-color:var(--border)}
+.slot-avatar-sm{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:0.78rem;font-weight:700;flex-shrink:0;background:linear-gradient(135deg,#1a2a0a,#2a4a10);color:var(--lime)}
+.slot-meta{flex:1;min-width:0}
+.slot-name{font-size:0.82rem;font-weight:600;color:var(--text-0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot-code{font-family:var(--font-mono);font-size:0.7rem;color:var(--text-2);margin-top:1px}
+.slot-badge{font-size:0.65rem;font-weight:600;padding:0.15rem 0.5rem;border-radius:4px;flex-shrink:0}
+.slot-badge.one{background:rgba(200,255,87,0.1);color:var(--lime)}
+.slot-badge.two{background:rgba(255,181,71,0.1);color:var(--amber)}
+.sidebar-close{position:absolute;top:1rem;right:1rem;width:30px;height:30px;border-radius:8px;background:var(--panel);border:1px solid var(--border);color:var(--text-1);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s}
+.sidebar-close:hover{background:var(--card-hover);color:var(--text-0)}
+
+/* EMPTY + LOADING */
+.empty-state{grid-column:1/-1;text-align:center;padding:4rem 2rem;color:var(--text-2)}
+.loading-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1rem}
+.skeleton{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem}
+.skel-line{border-radius:6px;background:linear-gradient(90deg,var(--panel) 25%,var(--card-hover) 50%,var(--panel) 75%);background-size:200% 100%;animation:shimmer 1.5s ease-in-out infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-avatar{width:46px;height:46px;border-radius:12px}
+.skel-h1{height:16px;margin-bottom:6px}
+.skel-h2{height:11px;width:60%}
+.skel-block{height:10px;margin:8px 0}
+
+/* OVERLAY */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:499;opacity:0;pointer-events:none;transition:opacity 0.4s;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.overlay.active{opacity:1;pointer-events:all}
+
+/* TOAST */
+.toast-container{position:fixed;bottom:1.5rem;right:1.5rem;z-index:3000;display:flex;flex-direction:column;gap:0.5rem}
+.toast{background:var(--card);border:1px solid var(--border-bright);border-radius:12px;padding:0.85rem 1.1rem;font-size:0.82rem;color:var(--text-0);display:flex;align-items:center;gap:0.6rem;box-shadow:var(--shadow-card);animation:toastIn 0.4s cubic-bezier(0.34,1.56,0.64,1);max-width:320px}
+@keyframes toastIn{from{opacity:0;transform:translateY(20px) scale(0.9)}to{opacity:1;transform:translateY(0) scale(1)}}
+.toast-icon{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.toast-icon.lime{background:var(--lime);box-shadow:0 0 8px var(--lime)}
+.toast-icon.amber{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.toast-icon.rose{background:var(--rose);box-shadow:0 0 8px var(--rose)}
+
+/* CONFIRM DIALOG */
+.confirm-overlay{display:none;position:fixed;inset:0;z-index:4000;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px)}
+.confirm-overlay.open{display:flex}
+.confirm-box{background:var(--card);border:1px solid rgba(255,107,138,0.3);border-radius:20px;padding:2rem;max-width:360px;width:90%;box-shadow:var(--shadow-deep);animation:panelIn 0.3s cubic-bezier(0.34,1.56,0.64,1);text-align:center}
+.confirm-icon{width:52px;height:52px;border-radius:14px;background:var(--rose-dim);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;color:var(--rose)}
+.confirm-title{font-family:var(--font-head);font-size:1.15rem;font-weight:700;margin-bottom:0.5rem}
+.confirm-text{font-size:0.82rem;color:var(--text-1);line-height:1.5;margin-bottom:1.5rem}
+.confirm-actions{display:flex;gap:0.75rem}
+.confirm-btn{flex:1;padding:0.65rem;border-radius:10px;border:1px solid transparent;font-family:var(--font-body);font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.2s}
+.confirm-btn.cancel{background:var(--panel);border-color:var(--border);color:var(--text-1)}
+.confirm-btn.cancel:hover{background:var(--card-hover);color:var(--text-0)}
+.confirm-btn.confirm{background:var(--rose-dim);border-color:rgba(255,107,138,0.3);color:var(--rose)}
+.confirm-btn.confirm:hover{background:rgba(255,107,138,0.25)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-bright);border-radius:10px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+
+/* LEAFLET */
+.leaflet-container{background:#0c0d14}
+.leaflet-tile{filter:brightness(0.85) saturate(0.8) hue-rotate(5deg)}
+/*cursor*/
+.cursor{
+  position:fixed;top:0;left:0;width:10px;height:10px;border-radius:50%;background:linear-gradient(123deg,green,blue,white);pointer-events:none;transform:translate(-50%,-50%) scale(1);transition:transform 0.15s ease-out;
+  z-index:4000;
+}
+.ring{
+  position:fixed;top:0;left:0;border:2px solid green;width:40px;height:40px;border-radius:50%;pointer-events:none;transform:translate(-50%,-50%) scale(1);transition:transform 0.15s ease-out;
+  z-index:4000;
+}
+/* RESPONSIVE */
+@media(max-width:768px){
+  .header-nav{display:none}
+  .search-label{font-size:1.5rem}
+  .stats-section{grid-template-columns:repeat(2,1fr)}
+  #tree{grid-template-columns:1fr}
+  .map-legend{display:none}
+  .map-footer{padding:0.65rem 1rem}
+  .detail-grid{grid-template-columns:1fr}
+  .detail-panel{border-radius:16px}
+  .map-shell{border-radius:16px;height:95vh}
+  .cursor,.ring{
+      display: none;
+  }
+  body{
+    cursor: auto;
+  }
+}
+@media(max-width:480px){
+  header{padding:0 1rem;height:60px}
+  .logo-text{font-size:1rem}
+  .search-hero{padding:1.5rem 1rem 0.75rem}
+  .stats-section{padding:0.5rem 1rem 1rem;grid-template-columns:repeat(2,1fr)}
+  .main-layout{padding:0 1rem 3rem}
+  .card-actions{flex-direction:column}
+  .cursor,.ring{
+      display: none;
+  }
+  body{
+    cursor: auto;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="ambient ambient-1"></div>
+<div class="ambient ambient-2"></div>
+<div class="overlay" id="overlay" onclick="closeNav()"></div>
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- CONFIRM DIALOG -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="confirm-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div class="confirm-title">Reset All Data?</div>
+    <div class="confirm-text">This will permanently delete all members and their referral data from both databases. This action cannot be undone.</div>
+    <div class="confirm-actions">
+      <button class="confirm-btn cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="confirm-btn confirm" onclick="doReset()">Yes, Reset All</button>
+    </div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<div id="mySidebar" class="sidebar">
+  <div class="sidebar-inner" style="position:relative">
+    <button class="sidebar-close" onclick="closeNav()">✕</button>
+    <div class="sidebar-head">
+      <div class="sidebar-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="5" r="3"/><circle cx="4" cy="19" r="3"/><circle cx="20" cy="19" r="3"/><path d="M12 8v3M8.5 17l3-5.5M15.5 17l-3-5.5"/></svg>
+        Open Slots
+      </div>
+      <div class="sidebar-sub">Members with available positions</div>
+    </div>
+    <div class="sidebar-search">
+      <div class="sidebar-search-wrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="sidebarSearch" placeholder="Search member…" oninput="filterSidebar()">
+      </div>
+    </div>
+    <div class="sidebar-list" id="referralsList"></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <button class="icon-btn" onclick="openNav()" title="Open Slots">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <a class="logo" href="#">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="5" r="3"/><circle cx="4" cy="19" r="3"/><circle cx="20" cy="19" r="3"/><path d="M12 8v3M8.5 17l3-5.5M15.5 17l-3-5.5"/></svg>
+    </div>
+    <div class="logo-text">NEXUS<span>.</span></div>
+  </a>
+  <nav class="header-nav">
+    <button class="nav-btn active">Members</button>
+    <button class="nav-btn danger" onclick="openConfirm()">Reset All</button>
+  </nav>
+  <div class="header-right">
+    <div class="live-pulse">
+      <div class="pulse-dot"></div>
+      LIVE
+    </div>
+    <button class="icon-btn" title="Refresh" onclick="manualRefresh()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- SEARCH HERO -->
+<div class="search-hero">
+  <div class="search-label">Binary <span>Referral</span> Network</div>
+  <div class="search-desc">Real-time member tracking · Binary tree structure · Live GPS mapping</div>
+  <div class="search-row">
+    <div class="search-field">
+      <div class="search-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <input id="searchInput" placeholder="Search by code, name, or phone…" oninput="filterCards()">
+    </div>
+    <div class="filter-chips">
+      <div class="chip active" onclick="setFilter('all',this)">All</div>
+      <div class="chip" onclick="setFilter('rewarded',this)">💰 Rewarded</div>
+      <div class="chip" onclick="setFilter('open',this)">⚡ Open Slots</div>
+      <div class="chip" onclick="setFilter('full',this)">✅ Full Network</div>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-section" id="statsSection">
+  <div class="stat-card lime">
+    <div class="stat-top">
+      <div class="stat-icon lime"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div class="stat-trend up">↑ Live</div>
+    </div>
+    <div class="stat-value" id="statTotal">—</div>
+    <div class="stat-label">Total Members</div>
+  </div>
+  <div class="stat-card amber">
+    <div class="stat-top">
+      <div class="stat-icon amber"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+    </div>
+    <div class="stat-value" id="statRewarded">—</div>
+    <div class="stat-label">Rewarded Members</div>
+  </div>
+  <div class="stat-card sky">
+    <div class="stat-top">
+      <div class="stat-icon sky"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+    </div>
+    <div class="stat-value" id="statOpen">—</div>
+    <div class="stat-label">Open Slots</div>
+  </div>
+  <div class="stat-card rose">
+    <div class="stat-top">
+      <div class="stat-icon rose"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+    </div>
+    <div class="stat-value" id="statNetwork">—</div>
+    <div class="stat-label">Network Depth</div>
+  </div>
+  <div class="stat-card violet">
+    <div class="stat-top">
+      <div class="stat-icon violet"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+    </div>
+    <div class="stat-value" id="statRewards">—</div>
+    <div class="stat-label">Total Rewards</div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-layout">
+  <div class="section-header">
+    <div class="section-title">
+      <div class="dot"></div>
+      Member Network
+      <span class="section-count" id="cardCount">0</span>
+    </div>
+    <div class="view-toggle">
+      <button class="active" id="gridViewBtn" onclick="toggleLayout('grid')" title="Grid View">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </button>
+      <button id="listViewBtn" onclick="toggleLayout('list')" title="List View">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+  <div id="loadingGrid" class="loading-grid">
+    <div class="skeleton"><div style="display:flex;gap:0.85rem;margin-bottom:1rem"><div class="skel-line skel-avatar"></div><div style="flex:1"><div class="skel-line skel-h1"></div><div class="skel-line skel-h2"></div></div></div><div class="skel-line skel-block" style="height:8px"></div><div class="skel-line skel-block" style="height:8px;width:80%"></div><div class="skel-line skel-block" style="height:8px;width:65%"></div></div>
+    <div class="skeleton"><div style="display:flex;gap:0.85rem;margin-bottom:1rem"><div class="skel-line skel-avatar"></div><div style="flex:1"><div class="skel-line skel-h1"></div><div class="skel-line skel-h2"></div></div></div><div class="skel-line skel-block" style="height:8px"></div><div class="skel-line skel-block" style="height:8px;width:80%"></div><div class="skel-line skel-block" style="height:8px;width:65%"></div></div>
+    <div class="skeleton"><div style="display:flex;gap:0.85rem;margin-bottom:1rem"><div class="skel-line skel-avatar"></div><div style="flex:1"><div class="skel-line skel-h1"></div><div class="skel-line skel-h2"></div></div></div><div class="skel-line skel-block" style="height:8px"></div><div class="skel-line skel-block" style="height:8px;width:80%"></div><div class="skel-line skel-block" style="height:8px;width:65%"></div></div>
+  </div>
+  <section id="tree"></section>
+</div>
+
+<!-- DETAIL MODAL -->
+<div id="detailModal">
+  <div class="detail-panel" id="detailPanelContent"></div>
+</div>
+
+<!-- MAP MODAL -->
+<div id="mapModal">
+  <div class="map-shell" id="mapShell">
+    <div class="map-head">
+      <div class="map-head-info">
+        <div class="map-head-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          Live Location Tracker
+        </div>
+        <div class="map-head-sub" id="mapUserLabel">Initialising…</div>
+      </div>
+      <div class="map-legend">
+        <div class="legend-item"><div class="legend-dot start"></div><span>Stored Location</span></div>
+        <div class="legend-item"><div class="legend-dot live"></div><span>Your Live Position</span></div>
+      </div>
+      <button class="map-btn ghost" style="margin-left:0.5rem" onclick="closeMap()">✕ Close</button>
+    </div>
+    <div class="map-status">
+      <div class="status-dot searching" id="liveDot"></div>
+      <span id="statusText">Requesting location…</span>
+    </div>
+    <div id="leafletMap"></div>
+    <div class="map-footer">
+      <div class="coords-chip" id="coordsDisplay">📍 Awaiting GPS…</div>
+      <button class="map-btn ghost" id="startBtn" style="display:none" onclick="goToStart()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+        Stored Pin
+      </button>
+      <button class="map-btn primary" onclick="recenterMap()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        Re-centre
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+/* ════════════════════════════════════════
+   FIREBASE INIT
+════════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyAVWLIDjsmMcH2kfqiKwQ1-jFU6d6654pY",
+  authDomain: "myproject-fdb4c.firebaseapp.com",
+  databaseURL: "https://myproject-fdb4c-default-rtdb.firebaseio.com",
+  projectId: "myproject-fdb4c",
+  storageBucket: "myproject-fdb4c.firebasestorage.app",
+  messagingSenderId: "600134367178",
+  appId: "1:600134367178:web:ea8b0daa3928c7791c8133"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* ════════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
+let tree          = {};       // keyed by Firebase record key
+let currentFilter = 'all';
+let currentLayout = 'grid';
+
+/* ════════════════════════════════════════
+   SINGLE SOURCE OF TRUTH: listen to 'submit'
+   We removed the submitcopy mirror to avoid
+   the race condition.  Dashboard reads
+   'submit' directly via a real-time listener.
+════════════════════════════════════════ */
+db.ref('submit').on('value', snap => {
+  tree = snap.val() || {};
+  document.getElementById('loadingGrid').style.display = 'none';
+  renderTree();
+});
+
+/* ════════════════════════════════════════
+   CONFIRM / RESET
+════════════════════════════════════════ */
+function openConfirm()  { document.getElementById('confirmOverlay').classList.add('open'); }
+function closeConfirm() { document.getElementById('confirmOverlay').classList.remove('open'); }
+
+function doReset() {
+  closeConfirm();
+  db.ref('submit').remove().then(() => {
+    db.ref('submitcopy').remove();
+    tree = {};
+    renderTree();
+    showToast('All data has been reset.', 'rose');
+  }).catch(() => showToast('Reset failed — check permissions.', 'rose'));
+}
+
+/* ════════════════════════════════════════
+   MAP STATE
+════════════════════════════════════════ */
+let leafletMap = null, storedMarker = null, liveMarker = null;
+let accuracyCircle = null, routeLine = null, watchId = null;
+let currentMapUser = null, mapInitialised = false, storedLatLng = null;
+
+/* ════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════ */
+function getInitials(name) {
+  if (!name) return '?';
+  return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+/* Reliable empty check for left/right child fields */
+function hasBranch(val) {
+  return val !== null && val !== undefined && String(val).trim() !== '';
+}
+
+/**
+ * Find a Firebase record key by referral code ('d' field).
+ * Case-insensitive.
+ */
+function findKeyByCode(code) {
+  if (!code) return null;
+  const search = String(code).trim().toUpperCase();
+  for (const k in tree) {
+    if (tree[k] && String(tree[k].d || '').trim().toUpperCase() === search) return k;
+  }
+  return null;
+}
+
+/**
+ * Count all nodes in the subtree rooted at `key` (including the node itself).
+ * Visits each node at most once via a visited set to prevent infinite loops.
+ */
+function countSubtree(rootKey) {
+  const visited = new Set();
+  const stack   = [rootKey];
+  let count     = 0;
+
+  while (stack.length > 0) {
+    const k = stack.pop();
+    if (!k || visited.has(k)) continue;
+    visited.add(k);
+    const node = tree[k];
+    if (!node) continue;
+    count++;
+    if (hasBranch(node.left))  { const lk = findKeyByCode(node.left);  if (lk) stack.push(lk); }
+    if (hasBranch(node.right)) { const rk = findKeyByCode(node.right); if (rk) stack.push(rk); }
+  }
+  return count;
+}
+
+/**
+ * Get the maximum depth of the subtree rooted at `key`.
+ */
+function getNetworkDepth(rootKey) {
+  const visited = new Set();
+
+  function dfs(k, depth) {
+    if (!k || visited.has(k)) return depth;
+    visited.add(k);
+    const node = tree[k];
+    if (!node) return depth;
+    let maxD = depth;
+    if (hasBranch(node.left))  { const lk = findKeyByCode(node.left);  if (lk) maxD = Math.max(maxD, dfs(lk, depth + 1)); }
+    if (hasBranch(node.right)) { const rk = findKeyByCode(node.right); if (rk) maxD = Math.max(maxD, dfs(rk, depth + 1)); }
+    return maxD;
+  }
+  return dfs(rootKey, 0);
+}
+
+/**
+ * Compute score for a node: 10 points per member in its subtree (excluding itself),
+ * capped at 100.  So score = 100 when the subtree has ≥ 11 members total.
+ */
+function computeScore(key) {
+  const subtree = countSubtree(key); // includes the node itself
+  return Math.min((subtree - 1) * 10, 100); // direct + indirect referrals × 10
+}
+
+function getAvatarClass(score) {
+  if (score >= 100) return 'gold';
+  if (score >= 60)  return 'blue';
+  if (score >= 30)  return 'violet';
+  return 'lime';
+}
+
+function getStripeClass(score) {
+  if (score >= 100) return 'gold';
+  if (score >= 60)  return 'blue';
+  if (score >= 30)  return 'violet';
+  return '';
+}
+
+function getBadge(score, childCount) {
+  if (score >= 100)      return { cls: 'top',     label: 'Top Earner' };
+  if (childCount === 2)  return { cls: 'active',  label: 'Full' };
+  if (score > 0)         return { cls: 'new',     label: 'Growing' };
+  return                        { cls: 'pending', label: 'Pending' };
+}
+
+/** Safely escape for HTML attribute strings inside onclick="..." */
+function safeAttr(str) {
+  return String(str || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g,  "\\'")
+    .replace(/"/g,  '&quot;')
+    .replace(/\n/g, ' ');
+}
+
+/** Escape for HTML content */
+function escHtml(str) {
+  return String(str || '')
+    .replace(/&/g,  '&amp;')
+    .replace(/</g,  '&lt;')
+    .replace(/>/g,  '&gt;')
+    .replace(/"/g,  '&quot;');
+}
+
+/* ════════════════════════════════════════
+   TOAST
+════════════════════════════════════════ */
+function showToast(msg, type = 'lime') {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = `<div class="toast-icon ${type}"></div>${escHtml(msg)}`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => {
+    el.style.cssText += 'opacity:0;transform:translateY(10px);transition:all 0.3s';
+    setTimeout(() => el.remove(), 300);
+  }, 3200);
+}
+
+/* ════════════════════════════════════════
+   FILTER & SEARCH
+════════════════════════════════════════ */
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderTree();
+}
+
+function filterCards() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('#tree .card').forEach(card => {
+    card.style.display = (card.dataset.search || '').includes(q) ? '' : 'none';
+  });
+  updateCardCount();
+}
+
+function updateCardCount() {
+  const visible = document.querySelectorAll('#tree .card:not([style*="display: none"])').length;
+  document.getElementById('cardCount').textContent = visible;
+}
+
+function toggleLayout(l) {
+  currentLayout = l;
+  document.getElementById('tree').className = l === 'list' ? 'list-view' : '';
+  document.getElementById('gridViewBtn').className = l === 'grid' ? 'active' : '';
+  document.getElementById('listViewBtn').className = l === 'list' ? 'active' : '';
+}
+
+function filterSidebar() {
+  const q = document.getElementById('sidebarSearch').value.toLowerCase();
+  document.querySelectorAll('.slot-item').forEach(el => {
+    el.style.display = el.dataset.search.includes(q) ? '' : 'none';
+  });
+}
+
+function manualRefresh() {
+  showToast('Network is live — data updates automatically.', 'lime');
+}
+
+/* ════════════════════════════════════════
+   RENDER CARDS
+════════════════════════════════════════ */
+function renderTree() {
+  const container = document.getElementById('tree');
+  const sideList  = document.getElementById('referralsList');
+  container.innerHTML = '';
+  sideList.innerHTML  = '';
+
+  let total = 0, rewarded = 0, openSlots = 0, maxDepth = 0, idx = 0;
+  const keys = Object.keys(tree);
+
+  for (const key of keys) {
+    const u = tree[key];
+    if (!u || !u.d) continue; // skip malformed records
+    total++;
+
+    const score       = computeScore(key);
+    const isRewarded  = score >= 100;
+    if (isRewarded) rewarded++;
+
+    const leftFilled  = hasBranch(u.left);
+    const rightFilled = hasBranch(u.right);
+    const childCount  = (leftFilled ? 1 : 0) + (rightFilled ? 1 : 0);
+    if (childCount < 2) openSlots++;
+
+    const depth = getNetworkDepth(key);
+    if (depth > maxDepth) maxDepth = depth;
+
+    /* Filter */
+    if (currentFilter === 'rewarded' && !isRewarded)    continue;
+    if (currentFilter === 'open'     && childCount >= 2) continue;
+    if (currentFilter === 'full'     && childCount < 2)  continue;
+
+    const avCls      = getAvatarClass(score);
+    const strCls     = getStripeClass(score);
+    const badge      = getBadge(score, childCount);
+    const leftLabel  = leftFilled  ? String(u.left)  : 'empty slot';
+    const rightLabel = rightFilled ? String(u.right) : 'empty slot';
+    const refCode    = u.d  || '—';
+    const userName   = u.a  || '—';
+
+    const card = document.createElement('div');
+    card.className   = 'card' + (isRewarded ? ' gold-card' : '');
+    card.style.animationDelay = (idx * 45) + 'ms';
+    card.dataset.search = (userName + refCode + (u.b || '') + leftLabel + rightLabel).toLowerCase();
+
+    card.innerHTML = `
+      <div class="card-glow"></div>
+      <div class="card-stripe ${strCls}"></div>
+      <div class="card-inner">
+        <div class="card-top">
+          <div class="avatar ${avCls}">
+            <div class="avatar-shine"></div>
+            ${escHtml(getInitials(u.a))}
+          </div>
+          <div class="card-meta">
+            <div class="card-name">${escHtml(userName)}</div>
+            <div class="card-phone">${escHtml(u.b || '')}</div>
+          </div>
+          <div class="card-badge ${badge.cls}">${badge.label}</div>
+        </div>
+
+        <div class="info-block">
+          <div class="info-row">
+            <div class="info-row-label">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Ref Code
+            </div>
+            <code class="ref-code ${isRewarded ? 'gold' : ''}">${escHtml(refCode)}</code>
+          </div>
+          <div class="info-row">
+            <div class="info-row-label">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Score
+            </div>
+            <span style="font-family:var(--font-mono);font-size:0.76rem;font-weight:600;color:${isRewarded ? 'var(--amber)' : 'var(--lime)'}">${score}/100</span>
+          </div>
+        </div>
+
+        <div class="branches">
+          <div class="branch ${leftFilled ? 'filled' + (isRewarded ? ' gold' : '') : ''}">
+            <div class="branch-label">◀ Left</div>
+            <div class="branch-name ${leftFilled ? (isRewarded ? 'gold' : '') : 'empty'}">${escHtml(leftLabel)}</div>
+          </div>
+          <div class="branch ${rightFilled ? 'filled' + (isRewarded ? ' gold' : '') : ''}">
+            <div class="branch-label">Right ▶</div>
+            <div class="branch-name ${rightFilled ? (isRewarded ? 'gold' : '') : 'empty'}">${escHtml(rightLabel)}</div>
+          </div>
+        </div>
+
+        <div class="progress-wrap">
+          <div class="progress-head">
+            <div class="progress-label">Network Score</div>
+            <div class="progress-val">${score}%</div>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill ${isRewarded ? 'gold' : ''}" style="width:${score}%"></div>
+          </div>
+        </div>
+
+        <div class="reward-row ${isRewarded ? 'unlocked' : 'locked'}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            ${isRewarded
+              ? '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'
+              : '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'}
+          </svg>
+          ${isRewarded ? 'Reward Unlocked 🎉' : 'Need ' + (100 - score) + '% more · ₹500 reward'}
+          <span class="reward-amount">${isRewarded ? '₹500' : '₹0'}</span>
+        </div>
+
+        <div class="card-actions">
+          <button class="action-btn primary" onclick="openMap('${safeAttr(userName)}','${safeAttr(refCode)}','${safeAttr(u.c1 || '')}','${safeAttr(u.c2 || '')}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            Track
+          </button>
+          <button class="action-btn secondary" onclick="openDetail('${safeAttr(key)}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Detail
+          </button>
+        </div>
+      </div>`;
+
+    container.appendChild(card);
+    idx++;
+
+    /* Sidebar: members with open slots */
+    if (childCount < 2) {
+      const slots = 2 - childCount;
+      const item  = document.createElement('div');
+      item.className    = 'slot-item';
+      item.dataset.search = (userName + refCode).toLowerCase();
+      item.onclick = () => { closeNav(); openDetail(key); };
+      item.innerHTML = `
+        <div class="slot-avatar-sm">${escHtml(getInitials(u.a))}</div>
+        <div class="slot-meta">
+          <div class="slot-name">${escHtml(userName)}</div>
+          <div class="slot-code">${escHtml(refCode)}</div>
+        </div>
+        <div class="slot-badge ${slots === 2 ? 'two' : 'one'}">${slots} open</div>`;
+      sideList.appendChild(item);
+    }
+  }
+
+  /* Stats */
+  animateStat('statTotal',    total);
+  animateStat('statRewarded', rewarded);
+  animateStat('statOpen',     openSlots);
+  animateStat('statNetwork',  maxDepth);
+  document.getElementById('statRewards').textContent = '₹' + (rewarded * 500).toLocaleString('en-IN');
+  document.getElementById('cardCount').textContent   = idx;
+
+  if (idx === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:1rem;opacity:0.3"><circle cx="12" cy="5" r="3"/><circle cx="4" cy="19" r="3"/><circle cx="20" cy="19" r="3"/><path d="M12 8v3M8.5 17l3-5.5M15.5 17l-3-5.5"/></svg>
+      <div style="font-size:0.9rem;margin-bottom:0.4rem">No members yet</div>
+      <div style="font-size:0.78rem">Orders will appear here in real-time</div>
+    </div>`;
+  }
+}
+
+/* ════════════════════════════════════════
+   ANIMATED STAT COUNTER
+════════════════════════════════════════ */
+function animateStat(id, target) {
+  const el  = document.getElementById(id);
+  let start = parseInt(el.textContent) || 0;
+  if (start === target) { el.textContent = target; return; }
+  const delta = target - start;
+  const steps = 24;
+  const step  = delta / steps;
+  let i = 0;
+  const timer = setInterval(() => {
+    i++;
+    start += step;
+    el.textContent = Math.round(i < steps ? start : target);
+    if (i >= steps) clearInterval(timer);
+  }, 25);
+}
+
+/* ════════════════════════════════════════
+   DETAIL MODAL
+════════════════════════════════════════ */
+function openDetail(key) {
+  const u = tree[key];
+  if (!u) return;
+
+  const score      = computeScore(key);
+  const isRewarded = score >= 100;
+  const avCls      = getAvatarClass(score);
+  const leftFilled  = hasBranch(u.left);
+  const rightFilled = hasBranch(u.right);
+  const childCount  = (leftFilled ? 1 : 0) + (rightFilled ? 1 : 0);
+  const subtreeSize = countSubtree(key);
+  const depth       = getNetworkDepth(key);
+  const leftLabel   = leftFilled  ? String(u.left)  : 'Empty';
+  const rightLabel  = rightFilled ? String(u.right) : 'Empty';
+
+  document.getElementById('detailPanelContent').innerHTML = `
+    <div class="detail-header">
+      <div class="avatar ${avCls}" style="width:56px;height:56px;font-size:1.3rem;border-radius:14px">
+        <div class="avatar-shine"></div>
+        ${escHtml(getInitials(u.a))}
+      </div>
+      <div>
+        <div class="detail-name">${escHtml(u.a || '—')}</div>
+        <div class="detail-sub">${escHtml(u.b || '')}${u.c1 ? ' · ' + Number(u.c1).toFixed(4) + ', ' + Number(u.c2).toFixed(4) : ''}</div>
+      </div>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-section">
+        <div class="detail-section-title">Identity</div>
+        <div class="detail-grid">
+          <div class="detail-field">
+            <div class="detail-field-label">Full Name</div>
+            <div class="detail-field-value">${escHtml(u.a || '—')}</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Phone</div>
+            <div class="detail-field-value mono">${escHtml(u.b || '—')}</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Referral Code</div>
+            <div class="detail-field-value mono lime">${escHtml(u.d || '—')}</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Product Ordered</div>
+            <div class="detail-field-value mono">${escHtml(u.e || '—')}</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Order Total</div>
+            <div class="detail-field-value mono">₹${u.total ? Number(u.total).toLocaleString('en-IN') : '—'}</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Placed Under</div>
+            <div class="detail-field-value mono">${escHtml(u.parent || 'Root')}</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Latitude</div>
+            <div class="detail-field-value mono">${u.c1 ? Number(u.c1).toFixed(6) : '—'}</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Longitude</div>
+            <div class="detail-field-value mono">${u.c2 ? Number(u.c2).toFixed(6) : '—'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Network Position</div>
+        <div class="detail-grid">
+          <div class="detail-field">
+            <div class="detail-field-label">Network Score</div>
+            <div class="detail-field-value ${isRewarded ? 'amber' : 'lime'}">${score}/100</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Direct Referrals</div>
+            <div class="detail-field-value">${childCount}/2</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Total Network</div>
+            <div class="detail-field-value">${subtreeSize} members</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Tree Depth</div>
+            <div class="detail-field-value">${depth} level${depth !== 1 ? 's' : ''}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Binary Tree Structure</div>
+        <div class="tree-viz">
+          <div class="tree-node-root">${escHtml(u.d || 'ROOT')}</div>
+          <div style="display:flex;gap:2rem">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem">
+              <div style="width:1px;height:24px;background:var(--border-bright)"></div>
+              <div class="tree-child ${leftFilled ? 'has-ref' : 'empty-slot'}">◀ ${escHtml(leftLabel)}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem">
+              <div style="width:1px;height:24px;background:var(--border-bright)"></div>
+              <div class="tree-child ${rightFilled ? 'has-ref' : 'empty-slot'}">${escHtml(rightLabel)} ▶</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Reward Status</div>
+        <div class="reward-row ${isRewarded ? 'unlocked' : 'locked'}" style="margin-bottom:0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            ${isRewarded
+              ? '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'
+              : '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'}
+          </svg>
+          ${isRewarded ? '₹500 Reward Unlocked! 🎉' : 'Needs ' + (100 - score) + '% more to unlock ₹500'}
+          <span class="reward-amount">${isRewarded ? '₹500' : '—'}</span>
+        </div>
+      </div>
+
+      <button class="action-btn primary" style="width:100%;margin-top:0.75rem"
+        onclick="closeDetail();openMap('${safeAttr(u.a || '')}','${safeAttr(u.d || '')}','${safeAttr(u.c1 || '')}','${safeAttr(u.c2 || '')}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="width:14px;height:14px">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+          <circle cx="12" cy="9" r="2.5"/>
+        </svg>
+        Open Live Tracker
+      </button>
+    </div>`;
+
+  document.getElementById('detailModal').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detailModal').classList.remove('open');
+}
+
+/* Close detail modal on backdrop click only */
+document.getElementById('detailModal').addEventListener('click', function(e) {
+  if (e.target === this) closeDetail();
+});
+
+/* ════════════════════════════════════════
+   MAP
+════════════════════════════════════════ */
+function makeStoredIcon(initials) {
+  const html = `<div style="position:relative;width:40px;height:48px">
+    <div style="width:40px;height:40px;border-radius:50% 50% 50% 0;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:3px solid #0c0d14;box-shadow:0 4px 16px rgba(59,130,246,0.6);transform:rotate(-45deg);display:flex;align-items:center;justify-content:center">
+      <span style="transform:rotate(45deg);color:white;font-weight:700;font-size:9px">${initials}</span>
+    </div>
+    <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:#3b82f6;box-shadow:0 0 12px rgba(59,130,246,0.6)"></div>
+  </div>`;
+  return L.divIcon({ className: '', html, iconSize: [40, 48], iconAnchor: [20, 48], popupAnchor: [0, -52] });
+}
+
+function makeLiveIcon() {
+  const html = `<div style="position:relative;width:40px;height:48px">
+    <div style="width:40px;height:40px;border-radius:50% 50% 50% 0;background:linear-gradient(135deg,#0a3d1f,#2dc76b);border:3px solid #0c0d14;box-shadow:0 4px 16px rgba(45,199,107,0.6);transform:rotate(-45deg);display:flex;align-items:center;justify-content:center">
+      <span style="transform:rotate(45deg);color:white;font-weight:700;font-size:8px">YOU</span>
+    </div>
+    <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:#c8ff57;box-shadow:0 0 12px rgba(200,255,87,0.8)"></div>
+  </div>`;
+  return L.divIcon({ className: '', html, iconSize: [40, 48], iconAnchor: [20, 48], popupAnchor: [0, -52] });
+}
+
+function openMap(userName, refCode, lat, lng) {
+  currentMapUser = { name: userName, code: refCode, c1: lat, c2: lng };
+  document.getElementById('mapUserLabel').textContent = `${userName} · ${refCode}`;
+  document.getElementById('mapModal').classList.add('open');
+  setMapStatus('searching', 'Requesting your location…');
+  document.getElementById('coordsDisplay').textContent = '📍 Awaiting GPS…';
+  document.getElementById('startBtn').style.display = 'none';
+
+  if (!mapInitialised) {
+    leafletMap = L.map('leafletMap', { zoomControl: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 19
+    }).addTo(leafletMap);
+    mapInitialised = true;
+  }
+
+  /* Clear previous markers/layers */
+  [storedMarker, liveMarker, accuracyCircle, routeLine].forEach(l => { if (l) { try { leafletMap.removeLayer(l); } catch(e){} } });
+  storedMarker = liveMarker = accuracyCircle = routeLine = null;
+  storedLatLng = null;
+
+  setTimeout(() => leafletMap && leafletMap.invalidateSize(), 200);
+
+  /* Pin the member's stored GPS location first */
+  if (lat && lng && !isNaN(parseFloat(lat))) {
+    storedLatLng = L.latLng(parseFloat(lat), parseFloat(lng));
+    storedMarker = L.marker(storedLatLng, { icon: makeStoredIcon(getInitials(userName)), zIndexOffset: 100 })
+      .addTo(leafletMap)
+      .bindPopup(`<div style="font-family:sans-serif;min-width:150px;font-size:0.85rem">
+        <b>📌 ${escHtml(userName)}</b><br>
+        <span style="color:#888;font-size:0.75rem">Code: ${escHtml(refCode)}</span><br>
+        <span style="color:#3b82f6;font-size:0.73rem;display:block;margin-top:4px">Stored location at order time</span><br>
+        <span style="color:#888;font-size:0.73rem">${parseFloat(lat).toFixed(6)}, ${parseFloat(lng).toFixed(6)}</span>
+      </div>`).openPopup();
+    document.getElementById('startBtn').style.display = 'flex';
+    leafletMap.setView(storedLatLng, 15, { animate: true });
+  }
+
+  startMapWatch();
+  showToast(`Tracking ${userName}`, 'lime');
+}
+
+function closeMap() {
+  document.getElementById('mapModal').classList.remove('open');
+  stopMapWatch();
+}
+
+function startMapWatch() {
+  if (!navigator.geolocation) { setMapStatus('error', 'Geolocation not supported.'); return; }
+  stopMapWatch();
+  const opts = { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 };
+  watchId = navigator.geolocation.watchPosition(onMapPos, onMapErr, opts);
+}
+
+function stopMapWatch() {
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+}
+
+function onMapPos(pos) {
+  const { latitude: lat, longitude: lng, accuracy: acc } = pos.coords;
+  const latlng = L.latLng(lat, lng);
+  setMapStatus('live', `Live position · ±${Math.round(acc)}m`);
+  document.getElementById('coordsDisplay').textContent = `📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+  if (!liveMarker) {
+    liveMarker = L.marker(latlng, { icon: makeLiveIcon() }).addTo(leafletMap)
+      .bindPopup(`<div style="font-family:sans-serif;font-size:0.82rem"><b>🟢 Your Live Position</b><br><span style="color:#888">±${Math.round(acc)}m accuracy</span></div>`);
+    accuracyCircle = L.circle(latlng, {
+      radius: acc, color: '#c8ff57', fillColor: '#c8ff57',
+      fillOpacity: 0.05, weight: 1.5, dashArray: '5 4'
+    }).addTo(leafletMap);
+
+    /* Fit to show both markers if we have a stored location */
+    if (storedLatLng) {
+      leafletMap.fitBounds([storedLatLng, latlng], { padding: [60, 60], maxZoom: 17 });
+      drawRoute(storedLatLng, latlng);
+    } else {
+      leafletMap.flyTo(latlng, 16, { duration: 1 });
+    }
+  } else {
+    liveMarker.setLatLng(latlng);
+    accuracyCircle.setLatLng(latlng);
+    accuracyCircle.setRadius(acc);
+  }
+}
+
+function onMapErr(err) {
+  const msgs = { 1: 'Location permission denied.', 2: 'GPS unavailable.', 3: 'Location timeout — retrying…' };
+  setMapStatus('error', msgs[err.code] || 'Location error.');
+  if (err.code === 3) setTimeout(startMapWatch, 5000);
+}
+
+function drawRoute(from, to) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (data.code === 'Ok' && data.routes?.[0]) {
+        if (routeLine) leafletMap.removeLayer(routeLine);
+        routeLine = L.geoJSON(data.routes[0].geometry, {
+          style: { color: '#c8ff57', weight: 4.5, opacity: 0.7, dashArray: '10 8', lineCap: 'round' }
+        }).addTo(leafletMap);
+        routeLine.bringToBack();
+      }
+    })
+    .catch(() => {}); // silent fail — route is optional
+}
+
+function recenterMap() {
+  if (!leafletMap) return;
+  if (storedLatLng && liveMarker) {
+    leafletMap.fitBounds([storedLatLng, liveMarker.getLatLng()], { padding: [60, 60], animate: true });
+  } else if (liveMarker) {
+    leafletMap.flyTo(liveMarker.getLatLng(), 16, { duration: 1 });
+  } else if (storedLatLng) {
+    leafletMap.flyTo(storedLatLng, 15, { duration: 1 });
+  }
+}
+
+function goToStart() {
+  if (storedMarker && leafletMap) {
+    leafletMap.flyTo(storedLatLng, 17, { duration: 1 });
+    storedMarker.openPopup();
+  }
+}
+
+function setMapStatus(type, text) {
+  document.getElementById('liveDot').className  = 'status-dot ' + type;
+  document.getElementById('statusText').textContent = text;
+}
+
+/* Close map modal on backdrop click only */
+document.getElementById('mapModal').addEventListener('click', function(e) {
+  if (e.target === this) closeMap();
+});
+
+/* ════════════════════════════════════════
+   SIDEBAR
+════════════════════════════════════════ */
+function openNav() {
+  document.getElementById('mySidebar').style.width = '300px';
+  document.getElementById('overlay').classList.add('active');
+}
+function closeNav() {
+  document.getElementById('mySidebar').style.width = '0';
+  document.getElementById('overlay').classList.remove('active');
+}
+let mousex=window.innerWidth/2;
+let mousey=window.innerHeight/2;
+let ringx=mousex;
+let ringy=mousey;
+const cursor = document.createElement('div');
+cursor.classList.add('cursor');
+document.body.appendChild(cursor);
+const ring=document.createElement('div');
+ring.classList.add('ring');
+document.body.appendChild(ring);
+document.addEventListener('mousemove', e => {
+  mousex = e.clientX;
+  mousey = e.clientY;
+  cursor.style.left = mousex + 'px';
+  cursor.style.top = mousey + 'px';
+});
+function animate() {
+  ringx += (mousex - ringx)*0.15;
+  ringy += (mousey - ringy) * 0.15;
+  ring.style.left = ringx + 'px';
+  ring.style.top = ringy + 'px';
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>
